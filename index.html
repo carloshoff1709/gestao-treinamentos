@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Gestão de Treinamentos e Versatilidade</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3d91">
+<meta name="description" content="Matriz de Versatilidade, treinamentos e capacitação da fábrica.">
+
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Treinamentos">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+
+<!-- =========== TELA DE LOGIN =========== -->
+<div id="telaLogin" style="display:flex;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;background:linear-gradient(180deg,#123a75,#0b1220);padding:20px;">
+  <form id="formLogin" style="background:#fff;border-radius:14px;padding:32px 28px;width:100%;max-width:360px;box-shadow:0 20px 50px rgba(0,0,0,.35);">
+    <div style="text-align:center;margin-bottom:18px;">
+      <img src="img/logo-azul.png" alt="Visia" style="height:40px;width:auto;">
+      <h1 style="font-size:17px;margin:10px 0 2px;">Gestão de Treinamentos</h1>
+      <p style="font-size:12px;color:#5f6b7a;margin:0;">Entre com seu e-mail e senha cadastrados</p>
+    </div>
+    <div class="campo" style="margin-bottom:12px;">
+      <label>E-mail</label>
+      <input type="email" id="loginEmail" required autocomplete="username">
+    </div>
+    <div class="campo" style="margin-bottom:6px;">
+      <label>Senha</label>
+      <input type="password" id="loginSenha" required autocomplete="current-password">
+    </div>
+    <p id="loginErro" style="color:#db4437;font-size:12px;min-height:16px;margin:4px 0 12px;"></p>
+    <button type="submit" id="btnEntrar" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;">Entrar</button>
+    <p style="font-size:11.5px;color:#5f6b7a;margin-top:14px;text-align:center;">
+      Esqueceu a senha? Peça a um Administrador para redefini-la em Configurações → Usuários.
+    </p>
+  </form>
+</div>
+
+<div id="app" style="display:none;">
+
+  <!-- =========== MENU LATERAL =========== -->
+  <aside id="sidebar">
+    <div class="logo"><img src="img/logo-branco.png" alt="Visia" style="height:30px;width:auto;"> <div><div id="nomeEmpresaSidebar">Gestão de Treinamentos</div><span class="sub">Matriz de Versatilidade</span></div></div>
+    <nav id="navMenu">
+      <div class="nav-item active" data-view="dashboard"><span class="ic">🏠</span> Dashboard</div>
+      <div class="nav-item" data-view="executivo"><span class="ic">📈</span> Dashboard Executivo</div>
+      <div class="nav-item" data-view="colaboradores"><span class="ic">👥</span> Colaboradores</div>
+      <div class="nav-item" data-view="matriz"><span class="ic">🧩</span> Matriz de Versatilidade</div>
+      <div class="nav-item" data-view="plano"><span class="ic">📅</span> Plano de Treinamento</div>
+      <div class="nav-item" data-view="historico"><span class="ic">📚</span> Histórico</div>
+      <div class="nav-item" data-view="processos"><span class="ic">⚙️</span> Processos e Competências</div>
+      <div class="nav-item" data-view="relatorios"><span class="ic">📊</span> Relatórios</div>
+      <div class="nav-item" data-view="alertas"><span class="ic">⚠️</span> Alertas</div>
+      <div class="nav-item" data-view="painel-tv"><span class="ic">📺</span> Painel de Gestão Visual</div>
+      <div class="nav-item" data-view="configuracoes"><span class="ic">🛠️</span> Configurações</div>
+    </nav>
+    <div class="rodape">
+      <button id="btnTrocarSenha" class="btn btn-sm" style="width:100%;margin-bottom:6px;">🔑 Trocar senha</button>
+      <button id="btnLogout" class="btn btn-sm" style="width:100%;">↪ Sair</button>
+    </div>
+  </aside>
+
+  <!-- =========== ÁREA PRINCIPAL =========== -->
+  <div id="main">
+    <header id="topbar">
+      <button id="menuToggle">☰</button>
+      <div class="titulo-view">
+        <span id="tituloViewTexto">Dashboard</span>
+        <small id="subtituloViewTexto">Visão geral da capacitação da fábrica</small>
+      </div>
+      <div class="busca-global">
+        <span class="ic">🔎</span>
+        <input type="text" id="inputBuscaGlobal" placeholder="Buscar colaborador, matrícula, processo..." autocomplete="off">
+        <div class="busca-resultados" id="resultadosBusca"></div>
+      </div>
+      <div class="user-chip">
+        <div class="avatar" id="avatarUsuario">?</div>
+        <div><div id="nomeUsuarioTopbar"></div><span class="badge-perfil" id="perfilUsuarioTopbar"></span></div>
+      </div>
+    </header>
+
+    <div id="conteudo">
+<!-- =========== FILTROS GLOBAIS (reaproveitados pelas views de indicadores) =========== -->
+      <div class="barra-filtros no-print" id="barraFiltros">
+        <div class="campo-filtro"><label>Setor</label><select id="fSetor"><option value="">Todos</option></select></div>
+        <div class="campo-filtro"><label>Área</label><select id="fArea"><option value="">Todas</option></select></div>
+        <div class="campo-filtro"><label>Função</label><select id="fFuncao"><option value="">Todas</option></select></div>
+        <div class="campo-filtro"><label>Turno</label><select id="fTurno"><option value="">Todos</option></select></div>
+        <div class="campo-filtro"><label>Processo</label><select id="fProcesso"><option value="">Todos</option></select></div>
+        <div class="campo-filtro"><label>Nível</label><select id="fNivel"><option value="">Todos</option></select></div>
+        <div class="campo-filtro"><label>Status</label><select id="fStatus"><option value="">Todos</option></select></div>
+        <button class="btn" id="btnLimparFiltros">✕ Limpar filtros</button>
+        <button class="btn btn-primary" id="btnAplicarFiltros">Aplicar filtros</button>
+      </div>
+
+      <!-- =========== DASHBOARD GERENCIAL =========== -->
+      <section class="view active" id="view-dashboard">
+        <div class="grid-kpis" id="kpisDashboard"></div>
+        <div class="grid-2">
+          <div class="painel"><h3>Distribuição por nível de habilidade</h3><canvas id="chartNiveis" height="220"></canvas></div>
+          <div class="painel"><h3>Cobertura por setor</h3><canvas id="chartCoberturaSetor" height="220"></canvas></div>
+        </div>
+        <div class="grid-2">
+          <div class="painel"><h3>Versatilidade média por função</h3><canvas id="chartVersatFuncao" height="220"></canvas></div>
+          <div class="painel"><h3>Treinamentos planejados x realizados</h3><canvas id="chartPlanejadoRealizado" height="220"></canvas></div>
+        </div>
+        <div class="grid-2">
+          <div class="painel"><h3>Vencidos por setor</h3><canvas id="chartVencidosSetor" height="220"></canvas></div>
+          <div class="painel"><h3>Evolução da capacitação (últimos meses)</h3><canvas id="chartEvolucao" height="220"></canvas></div>
+        </div>
+        <div class="grid-2">
+          <div class="painel"><h3>Top 10 processos — menor cobertura</h3><canvas id="chartTopMenorCobertura" height="240"></canvas></div>
+          <div class="painel"><h3>Top 10 colaboradores — maior versatilidade</h3><canvas id="chartTopVersatilidade" height="240"></canvas></div>
+        </div>
+        <div class="painel"><h3>Instrutores por processo</h3><canvas id="chartInstrutores" height="200"></canvas></div>
+        <div class="grid-2">
+          <div class="painel"><h3>⚠️ Processos críticos</h3><div id="listaProcessosCriticos"></div></div>
+          <div class="painel"><h3>🎯 Recomendações de treinamento prioritário</h3><div id="listaRecomendacoes"></div></div>
+        </div>
+      </section>
+
+      <!-- =========== DASHBOARD EXECUTIVO =========== -->
+      <section class="view" id="view-executivo">
+        <div class="grid-kpis" id="kpisExecutivo"></div>
+        <div class="painel"><h3>Tendência — cobertura e versatilidade (6 meses)</h3><canvas id="chartTendenciaExecutivo" height="240"></canvas></div>
+      </section>
+
+      <!-- =========== COLABORADORES =========== -->
+      <section class="view" id="view-colaboradores">
+        <div class="painel">
+          <h3>Colaboradores <span class="sub" id="totalColaboradoresLabel"></span>
+            <span>
+              <button class="btn btn-sm" id="btnImportarColaboradores">⬆️ Importar CSV</button>
+              <button class="btn btn-sm btn-primary" id="btnNovoColaborador">+ Novo colaborador</button>
+            </span>
+          </h3>
+          <div class="tabela-wrap"><table class="tabela" id="tabelaColaboradores">
+            <thead><tr><th>Matrícula</th><th>Nome</th><th>Setor</th><th>Função</th><th>Turno</th><th>Status</th><th>Versatilidade</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+          <div class="paginacao" id="paginacaoColaboradores"></div>
+        </div>
+      </section>
+
+      <!-- =========== MATRIZ DE VERSATILIDADE =========== -->
+      <section class="view" id="view-matriz">
+        <div class="painel">
+          <h3>Matriz de Versatilidade <span class="sub">Clique em uma célula para registrar avaliação</span></h3>
+          <div class="matriz-wrap"><table class="matriz" id="tabelaMatriz"></table></div>
+        </div>
+      </section>
+
+      <!-- =========== HISTÓRICO =========== -->
+      <section class="view" id="view-historico">
+        <div class="painel">
+          <h3>Histórico de Alterações</h3>
+          <div class="tabela-wrap"><table class="tabela" id="tabelaHistorico">
+            <thead><tr><th>Data</th><th>Colaborador</th><th>Processo</th><th>De</th><th>Para</th><th>Avaliador</th><th>Usuário</th><th>Observação</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+          <div class="paginacao" id="paginacaoHistorico"></div>
+        </div>
+      </section>
+
+      <!-- =========== PLANO DE TREINAMENTO =========== -->
+      <section class="view" id="view-plano">
+        <div class="painel">
+          <h3>Plano de Treinamento <span><button class="btn btn-sm btn-primary" id="btnNovoPlano">+ Novo treinamento</button></span></h3>
+          <div class="tabela-wrap"><table class="tabela" id="tabelaPlano">
+            <thead><tr><th>Colaborador</th><th>Setor</th><th>Processo</th><th>Treinamento</th><th>Instrutor</th><th>Planejada</th><th>Realizada</th><th>Status</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+          <div class="paginacao" id="paginacaoPlano"></div>
+        </div>
+      </section>
+
+      <!-- =========== PROCESSOS E COMPETÊNCIAS (cadastros) =========== -->
+      <section class="view" id="view-processos">
+        <div class="grid-2">
+          <div class="painel"><h3>Setores <button class="btn btn-sm btn-primary" id="btnNovoSetor">+ Novo</button></h3><div id="listaSetores"></div></div>
+          <div class="painel"><h3>Áreas <button class="btn btn-sm btn-primary" id="btnNovaArea">+ Nova</button></h3><div id="listaAreas"></div></div>
+        </div>
+        <div class="grid-2">
+          <div class="painel"><h3>Funções <button class="btn btn-sm btn-primary" id="btnNovaFuncao">+ Nova</button></h3><div id="listaFuncoes"></div></div>
+          <div class="painel"><h3>Processos / Competências <button class="btn btn-sm btn-primary" id="btnNovoProcesso">+ Novo</button></h3><div id="listaProcessos"></div></div>
+        </div>
+        <div class="painel"><h3>Mapa de Competências (cobertura % por setor)</h3><div class="tabela-wrap"><table class="tabela" id="tabelaMapaCompetencias"></table></div></div>
+        <div class="painel"><h3>Matriz de Sucessão / Backup</h3><div class="tabela-wrap"><table class="tabela" id="tabelaSucessao">
+          <thead><tr><th>Processo</th><th>Titular</th><th>Backups</th><th>Risco</th></tr></thead><tbody></tbody></table></div></div>
+      </section>
+
+      <!-- =========== RELATÓRIOS =========== -->
+      <section class="view" id="view-relatorios">
+        <div class="painel">
+          <h3>Relatórios</h3>
+          <div class="barra-filtros" style="margin-bottom:14px;">
+            <div class="campo-filtro"><label>Tipo de relatório</label>
+              <select id="selectTipoRelatorio">
+                <option value="matriz_versatilidade">Matriz de Versatilidade</option>
+                <option value="matriz_setor">Matriz por Setor</option>
+                <option value="matriz_funcao">Matriz por Função</option>
+                <option value="treinamentos_realizados">Treinamentos Realizados</option>
+                <option value="treinamentos_pendentes">Treinamentos Pendentes</option>
+                <option value="treinamentos_vencidos">Treinamentos Vencidos</option>
+                <option value="processos_criticos">Processos Críticos</option>
+                <option value="indice_versatilidade">Índice de Versatilidade</option>
+                <option value="plano_treinamento">Plano de Treinamento</option>
+                <option value="historico_capacitacoes">Histórico de Capacitações</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="btnGerarRelatorio">Gerar relatório</button>
+            <button class="btn" id="btnExportarCSV">⬇️ Exportar CSV</button>
+            <button class="btn" id="btnImprimirRelatorio">🖨️ Imprimir / PDF</button>
+          </div>
+          <div class="tabela-wrap"><table class="tabela" id="tabelaRelatorio"></table></div>
+        </div>
+      </section>
+
+      <!-- =========== ALERTAS =========== -->
+      <section class="view" id="view-alertas">
+        <div class="painel"><h3>⚠️ Alertas e Pendências</h3><div id="listaAlertasCompleta"></div></div>
+      </section>
+
+      <!-- =========== PAINEL DE GESTÃO VISUAL (TV) =========== -->
+      <section class="view" id="view-painel-tv">
+        <div class="grid-kpis" id="kpisPainelTv"></div>
+        <div class="grid-2">
+          <div class="painel"><h3>Cobertura por setor</h3><canvas id="chartTvCoberturaSetor" height="240"></canvas></div>
+          <div class="painel"><h3>Evolução mensal</h3><canvas id="chartTvEvolucao" height="240"></canvas></div>
+        </div>
+        <div class="grid-2">
+          <div class="painel"><h3>⚠️ Processos críticos</h3><div id="tvProcessosCriticos"></div></div>
+          <div class="painel"><h3>🔴 Treinamentos atrasados</h3><div id="tvAtrasados"></div></div>
+        </div>
+        <div class="painel"><h3>📅 Treinamentos de hoje</h3><div id="tvTreinamentosHoje"></div></div>
+        <div style="text-align:center;margin-top:10px;">
+          <button class="btn no-print" id="btnTelaCheia">⛶ Tela cheia</button>
+          <button class="btn no-print" id="btnSairTv">← Sair do modo TV</button>
+        </div>
+      </section>
+
+      <!-- =========== CONFIGURAÇÕES =========== -->
+      <section class="view" id="view-configuracoes">
+        <div class="grid-2">
+          <div class="painel">
+            <h3>Empresa</h3>
+            <div class="form-grid full" id="formEmpresa"></div>
+            <div style="margin-top:10px;"><button class="btn btn-primary" id="btnSalvarConfigEmpresa">Salvar</button></div>
+          </div>
+          <div class="painel">
+            <h3>Limites de Cobertura, Criticidade e Versatilidade</h3>
+            <div class="form-grid full" id="formLimites"></div>
+            <div style="margin-top:10px;"><button class="btn btn-primary" id="btnSalvarLimites">Salvar</button></div>
+          </div>
+        </div>
+        <div class="painel">
+          <h3>Níveis de Habilidade (escala configurável)</h3>
+          <div class="tabela-wrap"><table class="tabela" id="tabelaNiveis">
+            <thead><tr><th>#</th><th>Nome</th><th>Descrição</th><th>Cor</th><th>Ícone</th><th>Conta cobertura</th><th>Pode instruir</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </div>
+        <div class="painel">
+          <h3>Usuários e Permissões <span><button class="btn btn-sm btn-primary" id="btnNovoUsuario">+ Novo usuário</button></span></h3>
+          <div class="tabela-wrap"><table class="tabela" id="tabelaUsuarios">
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Ativo</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- =========== MODAIS =========== -->
+
+<div class="modal-overlay" id="modalCelula">
+  <div class="modal">
+    <div class="modal-header"><h3 id="modalCelulaTitulo">Avaliação de competência</h3><button onclick="fecharModal('modalCelula')">✕</button></div>
+    <div class="modal-body">
+      <p style="margin-top:0;font-size:12.8px;color:var(--texto-suave);" id="modalCelulaSubtitulo"></p>
+      <label style="font-size:11.5px;font-weight:700;color:var(--texto-suave);">Nível</label>
+      <div class="seletor-niveis" id="seletorNiveisCelula"></div>
+      <div class="form-grid" style="margin-top:12px;">
+        <div class="campo"><label>Data do treinamento</label><input type="date" id="celDataTreinamento"></div>
+        <div class="campo"><label>Data da avaliação</label><input type="date" id="celDataAvaliacao"></div>
+        <div class="campo"><label>Instrutor / Avaliador</label><select id="celInstrutor"><option value="">-</option></select></div>
+        <div class="campo"><label>Validade</label>
+          <select id="celValidadeTipo"><option>Sem validade</option><option>6 meses</option><option>12 meses</option><option>24 meses</option><option>Data específica</option></select>
+        </div>
+        <div class="campo" id="campoValidadeData" style="display:none;"><label>Data de validade</label><input type="date" id="celValidadeData"></div>
+        <div class="campo span2"><label>Observação</label><textarea id="celObservacao"></textarea></div>
+      </div>
+      <h4 style="margin:16px 0 8px;font-size:12.5px;">Histórico de alterações</h4>
+      <ul class="timeline" id="timelineCelula"></ul>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal('modalCelula')">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarCelula">Salvar avaliação</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalColaborador">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3 id="modalColaboradorTitulo">Novo colaborador</h3><button onclick="fecharModal('modalColaborador')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid" id="formColaborador"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal('modalColaborador')">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarColaborador">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalFicha">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3 id="modalFichaTitulo">Ficha do colaborador</h3><button onclick="fecharModal('modalFicha')">✕</button></div>
+    <div class="modal-body" id="modalFichaCorpo"></div>
+    <div class="modal-footer"><button class="btn" onclick="fecharModal('modalFicha')">Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalImportar">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3>Importar colaboradores (CSV)</h3><button onclick="fecharModal('modalImportar')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--texto-suave);">
+        Cole os dados (separados por vírgula ou ponto e vírgula) ou selecione um arquivo .csv com as colunas:
+        <b>MATRICULA, NOME, SETOR, AREA, FUNCAO, CARGO, TURNO, DATA_ADMISSAO</b>. Setor/Área/Função são criados automaticamente se não existirem.
+      </p>
+      <input type="file" id="arquivoImportar" accept=".csv" style="margin-bottom:8px;">
+      <textarea id="textoImportar" rows="8" style="width:100%;font-family:monospace;font-size:12px;" placeholder="MATRICULA,NOME,SETOR,AREA,FUNCAO,CARGO,TURNO,DATA_ADMISSAO"></textarea>
+      <div style="margin-top:10px;"><button class="btn" id="btnPreviewImportar">Pré-visualizar</button></div>
+      <div id="previewImportar" style="margin-top:12px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal('modalImportar')">Cancelar</button>
+      <button class="btn btn-primary" id="btnConfirmarImportar" disabled>Confirmar importação</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalGenerico">
+  <div class="modal">
+    <div class="modal-header"><h3 id="modalGenericoTitulo">Registro</h3><button onclick="fecharModal('modalGenerico')">✕</button></div>
+    <div class="modal-body"><div class="form-grid full" id="formGenerico"></div></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal('modalGenerico')">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarGenerico">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalPlano">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3 id="modalPlanoTitulo">Novo treinamento planejado</h3><button onclick="fecharModal('modalPlano')">✕</button></div>
+    <div class="modal-body"><div class="form-grid" id="formPlano"></div></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal('modalPlano')">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarPlano">Salvar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- =========== TROCAR SENHA =========== -->
+<div class="modal-overlay" id="modalSenha">
+  <div class="modal">
+    <div class="modal-header"><h3>Trocar senha</h3><button onclick="fecharModal('modalSenha')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid full">
+        <div class="campo"><label>Senha atual</label><input type="password" id="senhaAtual"></div>
+        <div class="campo"><label>Nova senha (mín. 6 caracteres)</label><input type="password" id="senhaNova"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharModal('modalSenha')">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarSenha">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<div id="loadingOverlay" style="position:fixed;inset:0;background:rgba(255,255,255,.6);display:none;align-items:center;justify-content:center;z-index:300;font-size:13px;font-weight:700;color:var(--azul-escuro);">
+  ⏳ Carregando...
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="api-config.js"></script>
+<script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+  }
+</script>
+</body>
+</html>
