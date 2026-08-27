@@ -130,7 +130,7 @@ function ligarEventosLogin() {
   document.getElementById('formLogin').addEventListener('submit', async e => {
     e.preventDefault();
     const email = document.getElementById('loginEmail').value.trim();
-    const senha = document.getElementById('loginSenha').value;
+    const senha = document.getElementById('loginSenha').value.trim();
     const btn = document.getElementById('btnEntrar');
     btn.disabled = true; btn.textContent = 'Entrando...';
     try {
