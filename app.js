@@ -141,7 +141,7 @@ function ligarEventosLogin() {
       await iniciarApp();
       if (resp.usuario.PRECISA_TROCAR_SENHA) abrirModalTrocarSenha();
     } catch (err) {
-      document.getElementById('loginErro').textContent = 'E-mail ou senha inválidos.';
+      document.getElementById('loginErro').textContent = (err && err.message) ? err.message : 'Erro desconhecido ao entrar.';
     } finally {
       btn.disabled = false; btn.textContent = 'Entrar';
     }
