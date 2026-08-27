@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "SUBSTITUA.PELO.PACOTE.DO.SEU.APP",
+      "sha256_cert_fingerprints": [
+        "SUBSTITUA:PELO:SHA256:DO:SEU:KEYSTORE:DE:ASSINATURA:GERADO:PELO:BUBBLEWRAP:OU:PLAY:APP:SIGNING"
+      ]
+    }
+  }
+]
