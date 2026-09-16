@@ -838,7 +838,7 @@ const CONFIG_GENERICO = {
   area: { titulo: 'Área', salvar: 'salvarArea', campos: [['SETOR_ID', 'Setor', 'select-setor'], ['NOME', 'Nome', 'text']] },
   funcao: { titulo: 'Função', salvar: 'salvarFuncao', campos: [['SETOR_ID', 'Setor', 'select-setor'], ['NOME', 'Nome', 'text']] },
   processo: { titulo: 'Processo / Competência', salvar: 'salvarProcesso', campos: [['FUNCAO_ID', 'Função', 'select-funcao'], ['NOME', 'Nome', 'text']] },
-  usuario: { titulo: 'Usuário', salvar: 'salvarUsuario', campos: [['EMAIL', 'E-mail (conta Google)', 'text'], ['NOME', 'Nome', 'text'], ['PERFIL', 'Perfil', 'select-perfil'], ['ATIVO', 'Ativo', 'select-bool']] }
+  usuario: { titulo: 'Usuário', salvar: 'salvarUsuario', campos: [['EMAIL', 'E-mail', 'text'], ['NOME', 'Nome', 'text'], ['PERFIL', 'Perfil', 'select-perfil'], ['ATIVO', 'Ativo', 'select-bool'], ['SENHA_TEMPORARIA', 'Senha inicial (opcional — deixe em branco para gerar automaticamente)', 'senha-nova']] }
 };
 
 function abrirModalGenerico(tipo, id) {
@@ -857,6 +857,9 @@ function abrirModalGenerico(tipo, id) {
     if (tipoCampo === 'select-funcao') return campoHtml(label, id_, 'select', ESTADO.boot.estrutura.funcoes.map(f => ({ v: f.FUNCAO_ID, n: f.NOME })), valorAtual);
     if (tipoCampo === 'select-perfil') return campoHtml(label, id_, 'select', ESTADO.boot.perfis.map(p => ({ v: p, n: p })), valorAtual || 'Visualização');
     if (tipoCampo === 'select-bool') return campoHtml(label, id_, 'select', [{ v: 'true', n: 'Sim' }, { v: 'false', n: 'Não' }], valorAtual === false ? 'false' : 'true');
+    // Campo de senha inicial: só faz sentido ao CRIAR um usuário novo (id ausente). Ao editar,
+    // a troca de senha é feita pelo próprio usuário ou pelo botão "Redefinir senha" — não aqui.
+    if (tipoCampo === 'senha-nova') return id ? '' : campoHtml(label, id_, 'password', null, '', true);
     return campoHtml(label, id_, 'text', null, valorAtual);
   }).join('');
   abrirModal('modalGenerico');
@@ -864,6 +867,7 @@ function abrirModalGenerico(tipo, id) {
 
 async function salvarGenerico() {
   const tipo = ESTADO.genericoTipo, cfg = CONFIG_GENERICO[tipo];
+  const criandoUsuarioNovo = tipo === 'usuario' && !ESTADO.genericoId;
   const item = {};
   const idCampoMap = { setor: 'SETOR_ID', area: 'AREA_ID', funcao: 'FUNCAO_ID', processo: 'PROCESSO_ID', usuario: 'USUARIO_ID' };
   item[idCampoMap[tipo]] = ESTADO.genericoId || '';
@@ -873,13 +877,23 @@ async function salvarGenerico() {
     item[campo] = v;
   });
   try {
-    await callServer(cfg.salvar, item);
+    const resultado = await callServer(cfg.salvar, item);
     toast(cfg.titulo + ' salvo com sucesso.', 'sucesso');
     fecharModal('modalGenerico');
     ESTADO.boot.estrutura = await callServer('getEstruturaCompleta');
     popularFiltros();
     if (['setor', 'area', 'funcao', 'processo'].indexOf(tipo) > -1) renderProcessos();
     if (tipo === 'usuario') renderConfiguracoes();
+    // Usuário novo: o backend gera uma senha temporária quando nenhuma é informada no formulário
+    // (o usuário é obrigado a trocá-la no primeiro login). Sem mostrar isso aqui, o admin não tem
+    // como repassar a senha — e o novo usuário nunca consegue entrar.
+    if (criandoUsuarioNovo && resultado && resultado.senhaTemporariaGerada) {
+      alert('Usuário criado com sucesso!\n\nSenha inicial gerada: ' + resultado.senhaTemporariaGerada +
+        '\n\nInforme essa senha ao colaborador. Ele será obrigado a trocá-la no primeiro acesso.\n\n' +
+        '(Anote agora — essa senha não será mostrada novamente. Se perder, use "Redefinir senha".)');
+    } else if (criandoUsuarioNovo) {
+      alert('Usuário criado com sucesso! Informe a senha inicial que você definiu ao colaborador — ele será obrigado a trocá-la no primeiro acesso.');
+    }
   } catch (e) {}
 }
 
@@ -984,8 +998,23 @@ async function renderConfiguracoes() {
   const usuarios = await callServer('listarUsuarios').catch(() => []);
   document.querySelector('#tabelaUsuarios tbody').innerHTML = (usuarios || []).map(u =>
     '<tr><td>' + esc(u.NOME) + '</td><td>' + esc(u.EMAIL) + '</td><td>' + esc(u.PERFIL) + '</td><td>' + (u.ATIVO ? 'Sim' : 'Não') + '</td>' +
-    '<td><button class="btn btn-sm" onclick="abrirModalGenericoUsuario(\'' + u.USUARIO_ID + '\',\'' + esc(u.EMAIL) + '\',\'' + esc(u.NOME) + '\',\'' + u.PERFIL + '\',' + !!u.ATIVO + ')">Editar</button></td></tr>'
+    '<td style="white-space:nowrap;">' +
+    '<button class="btn btn-sm" onclick="abrirModalGenericoUsuario(\'' + u.USUARIO_ID + '\',\'' + esc(u.EMAIL) + '\',\'' + esc(u.NOME) + '\',\'' + u.PERFIL + '\',' + !!u.ATIVO + ')">Editar</button> ' +
+    '<button class="btn btn-sm" onclick="redefinirSenhaUsuario(\'' + u.USUARIO_ID + '\',\'' + esc(u.NOME).replace(/'/g, "\\'") + '\')">🔑 Redefinir senha</button>' +
+    '</td></tr>'
   ).join('') || '<tr><td colspan="5"><div class="vazio">Somente administradores veem esta lista</div></td></tr>';
+}
+
+/** Admin redefine a senha de outro usuário (ex.: usuário novo perdeu a senha inicial, ou esqueceu a senha). */
+async function redefinirSenhaUsuario(usuarioId, nome) {
+  const novaSenha = prompt('Nova senha para ' + nome + ' (mínimo 6 caracteres):');
+  if (novaSenha === null) return; // cancelou
+  if (novaSenha.length < 6) { toast('A senha precisa ter pelo menos 6 caracteres.', 'erro'); return; }
+  try {
+    await callServer('redefinirSenha', usuarioId, novaSenha);
+    alert('Senha redefinida com sucesso!\n\nNova senha: ' + novaSenha +
+      '\n\nInforme essa senha a ' + nome + '. Ele(a) será obrigado(a) a trocá-la no primeiro acesso.');
+  } catch (e) {}
 }
 
 function abrirModalGenericoUsuario(id, email, nome, perfil, ativo) {
