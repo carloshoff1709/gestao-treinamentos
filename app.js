@@ -1211,42 +1211,42 @@ function fluxoRenderLegenda(niveis) {
 // é só a numeração do quadro original — não precisa ser sequencial nem único aqui.
 // Coordenadas num canvas fixo de FLUXO_MAPA_CANVAS.w × .h (não depende da quantidade de
 // processos, ao contrário da tela de detalhamento).
-const FLUXO_MAPA_CANVAS = { w: 1360, h: 740 };
+const FLUXO_MAPA_CANVAS = { w: 1650, h: 920 };
 
 const FLUXO_MAPA_NOS = [
-  { id: 'cad', tipo: 'processo', numero: 1, nome: 'CAD', x: 240, y: 235, w: 230, h: 58 },
-  { id: 'grc', tipo: 'processo', numero: 2, nome: 'GRC', x: 945, y: 118, w: 220, h: 58 },
-  { id: 'siscopen', tipo: 'processo', numero: 3, nome: 'Montagem Siscopen', x: 655, y: 312, w: 235, h: 58 },
-  { id: 'serralheria', tipo: 'processo', numero: 4, nome: 'Serralheria', x: 655, y: 38, w: 235, h: 58 },
-  { id: 'fastflex', tipo: 'processo', numero: 6, nome: 'Montagem Fastflex', x: 655, y: 450, w: 235, h: 58 },
-  { id: 'pesado', tipo: 'processo', numero: 6, nome: 'Montagem Pesado', x: 655, y: 598, w: 235, h: 58 },
+  { id: 'cad', tipo: 'processo', numero: 1, nome: 'CAD', x: 40, y: 380, w: 220, h: 56 },
+  { id: 'grc', tipo: 'processo', numero: 2, nome: 'GRC', x: 1080, y: 110, w: 220, h: 56 },
+  { id: 'siscopen', tipo: 'processo', numero: 3, nome: 'Montagem Siscopen', x: 720, y: 380, w: 230, h: 56 },
+  { id: 'serralheria', tipo: 'processo', numero: 4, nome: 'Serralheria', x: 720, y: 30, w: 230, h: 56 },
+  { id: 'fastflex', tipo: 'processo', numero: 6, nome: 'Montagem Fastflex', x: 720, y: 560, w: 230, h: 56 },
+  { id: 'pesado', tipo: 'processo', numero: 6, nome: 'Montagem Pesado', x: 720, y: 740, w: 230, h: 56 },
 
-  { id: 'out-cad', tipo: 'saida', nome: 'Barreira visual\nPainel V\nPainel W\nLages', x: 545, y: 190, w: 165, h: 80 },
-  { id: 'out-grc', tipo: 'saida', nome: 'Mesa\nBanco\nCama', x: 1210, y: 116, w: 120, h: 62 },
-  { id: 'out-cela', tipo: 'saida', nome: 'Cela', x: 655, y: 388, w: 105, h: 34 },
-  { id: 'out-passarela', tipo: 'saida', nome: 'Passarela', x: 792, y: 388, w: 105, h: 34 },
-  { id: 'out-fastflex', tipo: 'saida', nome: 'Módulo Fastflex', x: 722, y: 524, w: 140, h: 34 },
-  { id: 'out-pesado', tipo: 'saida', nome: 'Módulo Pesado', x: 722, y: 672, w: 140, h: 34 }
+  { id: 'out-cad', tipo: 'saida', nome: 'Barreira visual\nPainel V\nPainel W\nLages', x: 560, y: 240, w: 165, h: 78 },
+  { id: 'out-grc', tipo: 'saida', nome: 'Mesa\nBanco\nCama', x: 1350, y: 100, w: 120, h: 62 },
+  { id: 'out-cela', tipo: 'saida', nome: 'Cela', x: 720, y: 460, w: 105, h: 34 },
+  { id: 'out-passarela', tipo: 'saida', nome: 'Passarela', x: 865, y: 460, w: 105, h: 34 },
+  { id: 'out-fastflex', tipo: 'saida', nome: 'Módulo Fastflex', x: 790, y: 636, w: 140, h: 34 },
+  { id: 'out-pesado', tipo: 'saida', nome: 'Módulo Pesado', x: 790, y: 816, w: 140, h: 34 }
 ];
 
 const FLUXO_MAPA_LIGACOES = [
-  { de: 'cad', para: 'serralheria', rotulo: 'Ferragem\nInsert\nAlça\nChumbador\nGrades de Cela\nGrades de Passarela\nTubo de Reforço Aberturas' },
-  { de: 'cad', para: 'out-cad', rotulo: 'Luminária cela' },
-  { de: 'cad', para: 'siscopen', rotulo: 'MCC\nTeto\nPiso\nParede Direita\nParede Esquerda\nParede Porta\nParede Janela\nApoio de passarela\nVaso' },
-  { de: 'cad', para: 'siscopen', rotulo: 'MPA\nParede Janela\nParede Lisa\nPiso\nTeto' },
-  { de: 'serralheria', para: 'siscopen', rotulo: 'Mão-francesa' },
-  { de: 'serralheria', para: 'grc', rotulo: 'Ferragem da moldura\nInsert mesa/banco\nChumbador\nBastidor\nEPS' },
-  { de: 'serralheria', para: 'siscopen', rotulo: 'Moldura de cela\nMoldura de passarela' },
+  { de: 'cad', para: 'serralheria', rotulo: 'Ferragem\nInsert\nAlça\nChumbador\nGrades de Cela\nGrades de Passarela\nTubo de Reforço Aberturas', lx: 330, ly: 130 },
+  { de: 'cad', para: 'out-cad', rotulo: 'Luminária cela', lx: 420, ly: 320 },
+  { de: 'cad', para: 'siscopen', rotulo: 'MCC\nTeto\nPiso\nParede Direita\nParede Esquerda\nParede Porta\nParede Janela\nApoio de passarela\nVaso', lx: 340, ly: 430 },
+  { de: 'cad', para: 'siscopen', rotulo: 'MPA\nParede Janela\nParede Lisa\nPiso\nTeto', lx: 340, ly: 640 },
+  { de: 'serralheria', para: 'siscopen', rotulo: 'Mão-francesa', lx: 790, ly: 220 },
+  { de: 'serralheria', para: 'grc', rotulo: 'Ferragem da moldura\nInsert mesa/banco\nChumbador\nBastidor\nEPS', lx: 960, ly: 20 },
+  { de: 'serralheria', para: 'siscopen', rotulo: 'Moldura de cela\nMoldura de passarela', lx: 790, ly: 150 },
   { de: 'grc', para: 'out-grc', rotulo: '' },
-  { de: 'grc', para: 'siscopen', rotulo: 'Móveis\nCapa de Cela\nCapa de Passarela\nSoleira' },
-  { de: 'grc', para: 'fastflex', rotulo: 'Estrutura de Teto de GRC\nStud Frame' },
-  { de: 'grc', para: 'pesado', rotulo: 'Teto de GRC' },
+  { de: 'grc', para: 'siscopen', rotulo: 'Móveis\nCapa de Cela\nCapa de Passarela\nSoleira', lx: 1010, ly: 260 },
+  { de: 'grc', para: 'fastflex', rotulo: 'Estrutura de Teto de GRC\nStud Frame', lx: 1010, ly: 470 },
+  { de: 'grc', para: 'pesado', rotulo: 'Teto de GRC', lx: 1010, ly: 650 },
   { de: 'siscopen', para: 'out-cela', rotulo: '' },
   { de: 'siscopen', para: 'out-passarela', rotulo: '' },
-  { de: 'cad', para: 'fastflex', rotulo: 'Tubo de reforço do módulo\nAlças de içamento do módulo\nTubo de queda d\'água do teto\nAlça içamento do piso\nChapas de reforço do piso e do teto\nTubo de reforço cabeceira do piso\nMalha do piso Fastflex\nViga I4' },
-  { de: 'cad', para: 'fastflex', rotulo: 'Estrutura de Piso\nKit Hidráulico\nKit Elétrico' },
-  { de: 'cad', para: 'fastflex', rotulo: 'Piso Fastflex\nPainel Pesado\nVaso Direito\nVaso Esquerdo\nChicane\nCama Intima' },
-  { de: 'cad', para: 'pesado', rotulo: 'Tubo de reforço do módulo\nAlças de içamento do módulo' },
+  { de: 'cad', para: 'fastflex', rotulo: 'Tubo de reforço do módulo\nAlças de içamento do módulo\nTubo de queda d\'água do teto\nAlça içamento do piso\nChapas de reforço do piso e do teto\nTubo de reforço cabeceira do piso\nMalha do piso Fastflex\nViga I4', lx: 20, ly: 20 },
+  { de: 'cad', para: 'fastflex', rotulo: 'Estrutura de Piso\nKit Hidráulico\nKit Elétrico', lx: 20, ly: 470 },
+  { de: 'cad', para: 'fastflex', rotulo: 'Piso Fastflex\nPainel Pesado\nVaso Direito\nVaso Esquerdo\nChicane\nCama Intima', lx: 20, ly: 620 },
+  { de: 'cad', para: 'pesado', rotulo: 'Tubo de reforço do módulo\nAlças de içamento do módulo', lx: 20, ly: 800 },
   { de: 'fastflex', para: 'out-fastflex', rotulo: '' },
   { de: 'pesado', para: 'out-pesado', rotulo: '' }
 ];
@@ -1325,13 +1325,23 @@ function montarFluxoMapa() {
 
   FLUXO_MAPA_LIGACOES.forEach(lig => {
     if (!lig.rotulo) return;
-    const pontos = fluxoMapaAncorasLig_(lig);
-    if (!pontos) return;
-    const meio = fluxoMid(pontos.p1, pontos.p2);
+    // Posição do rótulo: usa as coordenadas fixas (lx/ly) definidas à mão em cada ligação —
+    // testadas para não sobrepor nenhum outro rótulo nem nó do mapa. Sem lx/ly (não deveria
+    // ocorrer para uma ligação com rótulo, mas fica como resguardo), cai de volta no ponto médio
+    // da linha, que foi a causa dos rótulos sobrepostos antes desta correção.
+    let x, y;
+    if (lig.lx != null && lig.ly != null) {
+      x = lig.lx; y = lig.ly;
+    } else {
+      const pontos = fluxoMapaAncorasLig_(lig);
+      if (!pontos) return;
+      const meio = fluxoMid(pontos.p1, pontos.p2);
+      x = Math.min(meio.x, FLUXO_MAPA_CANVAS.w - 170); y = meio.y;
+    }
     const lbl = document.createElement('div');
     lbl.className = 'fluxo-map-label';
-    lbl.style.left = Math.min(meio.x, FLUXO_MAPA_CANVAS.w - 170) + 'px';
-    lbl.style.top = meio.y + 'px';
+    lbl.style.left = x + 'px';
+    lbl.style.top = y + 'px';
     lbl.innerHTML = esc(lig.rotulo).split('\n').join('<br>');
     canvas.appendChild(lbl);
   });
