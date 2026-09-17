@@ -90,7 +90,6 @@
 <!-- =========== FILTROS GLOBAIS (reaproveitados pelas views de indicadores) =========== -->
       <div class="barra-filtros no-print" id="barraFiltros">
         <div class="campo-filtro"><label>Setor</label><select id="fSetor"><option value="">Todos</option></select></div>
-        <div class="campo-filtro"><label>Área</label><select id="fArea"><option value="">Todas</option></select></div>
         <div class="campo-filtro"><label>Função</label><select id="fFuncao"><option value="">Todas</option></select></div>
         <div class="campo-filtro"><label>Turno</label><select id="fTurno"><option value="">Todos</option></select></div>
         <div class="campo-filtro"><label>Processo</label><select id="fProcesso"><option value="">Todos</option></select></div>
@@ -219,12 +218,9 @@
       <section class="view" id="view-processos">
         <div class="grid-2">
           <div class="painel"><h3>Setores <button class="btn btn-sm btn-primary" id="btnNovoSetor">+ Novo</button></h3><div id="listaSetores"></div></div>
-          <div class="painel"><h3>Áreas <button class="btn btn-sm btn-primary" id="btnNovaArea">+ Nova</button></h3><div id="listaAreas"></div></div>
-        </div>
-        <div class="grid-2">
           <div class="painel"><h3>Funções <button class="btn btn-sm btn-primary" id="btnNovaFuncao">+ Nova</button></h3><div id="listaFuncoes"></div></div>
-          <div class="painel"><h3>Processos / Competências <button class="btn btn-sm btn-primary" id="btnNovoProcesso">+ Novo</button></h3><div id="listaProcessos"></div></div>
         </div>
+        <div class="painel"><h3>Processos / Competências <button class="btn btn-sm btn-primary" id="btnNovoProcesso">+ Novo</button></h3><div id="listaProcessos"></div></div>
         <div class="painel"><h3>Mapa de Competências (cobertura % por setor)</h3><div class="tabela-wrap"><table class="tabela" id="tabelaMapaCompetencias"></table></div></div>
         <div class="painel"><h3>Matriz de Sucessão / Backup</h3><div class="tabela-wrap"><table class="tabela" id="tabelaSucessao">
           <thead><tr><th>Processo</th><th>Titular</th><th>Backups</th><th>Risco</th></tr></thead><tbody></tbody></table></div></div>
@@ -370,10 +366,10 @@
     <div class="modal-body">
       <p style="font-size:12.5px;color:var(--texto-suave);">
         Cole os dados (separados por vírgula ou ponto e vírgula) ou selecione um arquivo .csv com as colunas:
-        <b>MATRICULA, NOME, SETOR, AREA, FUNCAO, CARGO, TURNO, DATA_ADMISSAO</b>. Setor/Área/Função são criados automaticamente se não existirem.
+        <b>MATRICULA, NOME, SETOR, FUNCAO, TURNO, DATA_ADMISSAO</b>. Setor/Função são criados automaticamente se não existirem.
       </p>
       <input type="file" id="arquivoImportar" accept=".csv" style="margin-bottom:8px;">
-      <textarea id="textoImportar" rows="8" style="width:100%;font-family:monospace;font-size:12px;" placeholder="MATRICULA,NOME,SETOR,AREA,FUNCAO,CARGO,TURNO,DATA_ADMISSAO"></textarea>
+      <textarea id="textoImportar" rows="8" style="width:100%;font-family:monospace;font-size:12px;" placeholder="MATRICULA,NOME,SETOR,FUNCAO,TURNO,DATA_ADMISSAO"></textarea>
       <div style="margin-top:10px;"><button class="btn" id="btnPreviewImportar">Pré-visualizar</button></div>
       <div id="previewImportar" style="margin-top:12px;"></div>
     </div>
