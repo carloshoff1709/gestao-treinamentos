@@ -91,10 +91,12 @@ const ESTADO = {
   colaboradorEditando: null,
   planoEditando: null,
   celulaAtual: null,
-  relatorioAtual: null
+  relatorioAtual: null,
+  fluxoTela: 'mapa' // 'mapa' = fluxo principal (setores produtivos) · 'setor' = detalhamento de um setor
 };
 
 const TITULOS_VIEW = {
+  fluxo: ['Fluxo e Documentos', 'Fluxo produtivo, FTP/POP/PA e matriz de versatilidade'],
   dashboard: ['Dashboard', 'Visão geral da capacitação da fábrica'],
   executivo: ['Dashboard Executivo', 'Principais indicadores para gestão e diretoria'],
   colaboradores: ['Colaboradores', 'Cadastro e gestão da equipe'],
@@ -108,7 +110,7 @@ const TITULOS_VIEW = {
   configuracoes: ['Configurações', 'Parâmetros gerais do sistema']
 };
 
-const VIEWS_SEM_FILTRO = ['colaboradores', 'processos', 'relatorios', 'alertas', 'painel-tv', 'configuracoes'];
+const VIEWS_SEM_FILTRO = ['fluxo', 'colaboradores', 'processos', 'relatorios', 'alertas', 'painel-tv', 'configuracoes'];
 
 // ---------------------------------------------------------------
 // 2) INICIALIZAÇÃO E LOGIN
@@ -235,6 +237,14 @@ function ligarEventosGlobais() {
     if (el.requestFullscreen) el.requestFullscreen();
   });
   document.getElementById('btnSairTv').addEventListener('click', () => trocarView('dashboard'));
+
+  document.getElementById('fluxoSetor').addEventListener('change', async e => {
+    FLUXO_SETOR_ATUAL = e.target.value;
+    FLUXO_PZ.userInteragiu = false;
+    await renderFluxo();
+  });
+  document.getElementById('fluxoVoltarMapa').addEventListener('click', fluxoVoltarMapa);
+  fluxoIniciarInteracao();
 }
 
 // ---------------------------------------------------------------
@@ -242,6 +252,7 @@ function ligarEventosGlobais() {
 // ---------------------------------------------------------------
 async function trocarView(view) {
   ESTADO.viewAtual = view;
+  if (FLUXO_DOC_STACK.length) { FLUXO_DOC_STACK.length = 0; fluxoRenderModal(); } // fecha visualizador de FTP/POP/PA se estava aberto
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === view));
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
@@ -250,7 +261,8 @@ async function trocarView(view) {
   document.getElementById('barraFiltros').style.display = VIEWS_SEM_FILTRO.indexOf(view) > -1 ? 'none' : 'flex';
   document.getElementById('sidebar').classList.remove('open');
 
-  if (view === 'dashboard') await renderDashboard();
+  if (view === 'fluxo') { ESTADO.fluxoTela = 'mapa'; await renderFluxo(); }
+  else if (view === 'dashboard') await renderDashboard();
   else if (view === 'executivo') await renderExecutivo();
   else if (view === 'colaboradores') await renderColaboradores(1);
   else if (view === 'matriz') await renderMatriz();
@@ -837,7 +849,10 @@ const CONFIG_GENERICO = {
   setor: { titulo: 'Setor', salvar: 'salvarSetor', campos: [['NOME', 'Nome', 'text']] },
   area: { titulo: 'Área', salvar: 'salvarArea', campos: [['SETOR_ID', 'Setor', 'select-setor'], ['NOME', 'Nome', 'text']] },
   funcao: { titulo: 'Função', salvar: 'salvarFuncao', campos: [['SETOR_ID', 'Setor', 'select-setor'], ['NOME', 'Nome', 'text']] },
-  processo: { titulo: 'Processo / Competência', salvar: 'salvarProcesso', campos: [['FUNCAO_ID', 'Função', 'select-funcao'], ['NOME', 'Nome', 'text']] },
+  processo: { titulo: 'Processo / Competência', salvar: 'salvarProcesso', campos: [['FUNCAO_ID', 'Função', 'select-funcao'], ['NOME', 'Nome', 'text'],
+    ['FTP_CODIGO', 'Código do FTP (ex.: F1000 — opcional)', 'text'],
+    ['FTP', 'Link da pasta do Drive com a FTP (opcional)', 'text'],
+    ['POP', 'Link da pasta do Drive com o POP (opcional)', 'text'], ['PA', 'Link da pasta do Drive com os PA (opcional)', 'text']] },
   usuario: { titulo: 'Usuário', salvar: 'salvarUsuario', campos: [['EMAIL', 'E-mail', 'text'], ['NOME', 'Nome', 'text'], ['PERFIL', 'Perfil', 'select-perfil'], ['ATIVO', 'Ativo', 'select-bool'], ['SENHA_TEMPORARIA', 'Senha inicial (opcional — deixe em branco para gerar automaticamente)', 'senha-nova']] }
 };
 
@@ -1064,3 +1079,647 @@ async function salvarLimites() {
   ESTADO.boot.config = await callServer('getAllConfig');
   toast('Limites salvos com sucesso.', 'sucesso');
 }
+
+// ---------------------------------------------------------------
+// 19) FLUXO E DOCUMENTOS (fluxograma do setor + FTP/POP/PA + matriz)
+// ---------------------------------------------------------------
+// Um card por Processo do Setor selecionado, ligados em sequência (a ordem/posição é gerada
+// automaticamente, pode ser ajustada depois). Cada card mostra a cobertura de treinamento
+// (reaproveitando a mesma lógica de getCoberturaPorProcesso/getRiscoDependencia do Dashboard,
+// calculada aqui a partir de getMatrizVersatilidade para não duplicar chamada nenhuma nova no
+// backend) e os documentos FTP/POP/PA do processo (pastas do Drive salvas em PROCESSOS.FTP/.POP/.PA,
+// listadas via listarArquivosPasta). Sem emojis nesta tela — só ícones SVG e texto.
+
+let FLUXO_SETOR_ATUAL = null;
+let FLUXO_STATIONS = [];
+let FLUXO_DOC_STACK = [];
+const FLUXO_PZ = { scale: 1, tx: 0, ty: 0, min: 0.3, max: 2.2, pointers: new Map(), panStart: null, pinchStart: null, userInteragiu: false, iniciado: false, moveu: false };
+const FLUXO_COL_X = [40, 420, 800];
+const FLUXO_ROW_H = 620;
+const FLUXO_CARD_W = 300;
+const FLUXO_ANCHOR_TOP_Y = 44;
+const FLUXO_ANCHOR_DROP_Y = 340;
+
+function cfgValor(chave, padrao) {
+  const item = (ESTADO.boot.config || []).find(c => c.CHAVE === chave);
+  return (item && item.VALOR !== '' && item.VALOR !== null && item.VALOR !== undefined) ? item.VALOR : padrao;
+}
+
+async function renderFluxo() {
+  const vazio = document.getElementById('fluxoVazio');
+  const conteudo = document.getElementById('fluxoConteudo');
+  const btnVoltar = document.getElementById('fluxoVoltarMapa');
+  const toolbarSetor = document.getElementById('fluxoToolbarSetor');
+  const hint = document.getElementById('fluxoHint');
+
+  // ---------- tela 1: fluxo principal (mapa fixo dos setores produtivos) ----------
+  if (ESTADO.fluxoTela !== 'setor') {
+    ESTADO.fluxoTela = 'mapa';
+    btnVoltar.hidden = true;
+    toolbarSetor.hidden = true;
+    hint.textContent = 'Clique numa etapa do fluxo para ver os processos, os documentos (FTP/POP/PA) e a cobertura de treinamento daquele setor · ' +
+      'arraste para navegar · roda do mouse ou pinça para zoom';
+    vazio.style.display = 'none';
+    conteudo.style.display = 'block';
+    montarFluxoMapa();
+    return;
+  }
+
+  // ---------- tela 2: detalhamento do setor (cards por processo, igual antes) ----------
+  btnVoltar.hidden = false;
+  toolbarSetor.hidden = false;
+  hint.textContent = 'Arraste para navegar · roda do mouse ou pinça para zoom · duplo clique/toque centraliza';
+
+  const setores = ESTADO.boot.estrutura.setores;
+  const selSetor = document.getElementById('fluxoSetor');
+
+  if (!setores.length) {
+    selSetor.innerHTML = '';
+    vazio.textContent = 'Nenhum setor cadastrado ainda. Cadastre em "Processos e Competências".';
+    vazio.style.display = 'block';
+    conteudo.style.display = 'none';
+    document.getElementById('fluxoLegenda').innerHTML = '';
+    return;
+  }
+
+  if (!FLUXO_SETOR_ATUAL || !setores.some(s => s.SETOR_ID === FLUXO_SETOR_ATUAL)) FLUXO_SETOR_ATUAL = setores[0].SETOR_ID;
+  selSetor.innerHTML = setores.map(s => '<option value="' + s.SETOR_ID + '">' + esc(s.NOME) + '</option>').join('');
+  selSetor.value = FLUXO_SETOR_ATUAL;
+
+  const processos = ESTADO.boot.estrutura.processos.filter(p => p.SETOR_ID === FLUXO_SETOR_ATUAL && p.ATIVO !== false);
+  fluxoRenderLegenda(ESTADO.boot.estrutura.niveis);
+
+  if (!processos.length) {
+    vazio.textContent = 'Nenhum processo cadastrado para este setor ainda. Cadastre em "Processos e Competências".';
+    vazio.style.display = 'block';
+    conteudo.style.display = 'none';
+    return;
+  }
+  vazio.style.display = 'none';
+  conteudo.style.display = 'block';
+
+  const [matriz, etapas] = await Promise.all([
+    callServer('getMatrizVersatilidade', { setorId: FLUXO_SETOR_ATUAL }),
+    // listarEtapasPop é opcional/aditivo (etapas do POP transcritas do fluxo produtivo) — se o
+    // backend ainda não tiver essa função publicada (versão antiga), o card simplesmente não
+    // mostra a lista de etapas, sem quebrar o resto da tela.
+    callServer('listarEtapasPop').catch(() => [])
+  ]);
+  montarFluxoCanvas(processos, matriz.colaboradores, matriz.celulas, ESTADO.boot.estrutura.niveis, ESTADO.boot.estrutura.funcoes, etapas);
+}
+
+// Remove acentos/maiúsculas para comparar nomes de setor com tolerância (o nome no mapa do
+// fluxo principal, ex. "CAD", precisa bater com o nome cadastrado em Setores, que pode variar
+// um pouco de escrita).
+function fluxoNormaliza_(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
+function fluxoAbrirSetor(nomeSetor) {
+  const setores = ESTADO.boot.estrutura.setores;
+  const alvo = fluxoNormaliza_(nomeSetor);
+  const achado = setores.find(s => fluxoNormaliza_(s.NOME) === alvo) ||
+    setores.find(s => { const n = fluxoNormaliza_(s.NOME); return n && (n.indexOf(alvo) > -1 || alvo.indexOf(n) > -1); });
+  if (!achado) {
+    toast('Setor "' + nomeSetor + '" não encontrado no cadastro. Crie um setor com esse nome em Processos e Competências → Setores.', 'erro');
+    return;
+  }
+  FLUXO_SETOR_ATUAL = achado.SETOR_ID;
+  ESTADO.fluxoTela = 'setor';
+  FLUXO_PZ.userInteragiu = false;
+  renderFluxo();
+}
+
+function fluxoVoltarMapa() {
+  ESTADO.fluxoTela = 'mapa';
+  FLUXO_PZ.userInteragiu = false;
+  renderFluxo();
+}
+
+function fluxoRenderLegenda(niveis) {
+  document.getElementById('fluxoLegenda').innerHTML = niveis.map(n =>
+    '<span class="item"><span class="dot" style="background:' + n.COR + '"></span>' + n.NIVEL_ID + ' · ' + esc(n.NOME) + '</span>'
+  ).join('');
+}
+
+// ---------------------------------------------------------------
+// FLUXO PRINCIPAL — mapa fixo dos setores produtivos (tela de entrada da aba "Fluxo e
+// Documentos"). Layout manual (não gerado automaticamente), transcrito do fluxograma de
+// processo produtivo do usuário (quadro Miro). Cada nó "processo" (caixa preta) é clicável e
+// abre o detalhamento daquele setor — mesma tela de cards que já existia antes, encontrada por
+// nome via fluxoAbrirSetor(). O "id" do setor 4/6/6 repetido (Serralheria e as duas Montagens)
+// é só a numeração do quadro original — não precisa ser sequencial nem único aqui.
+// Coordenadas num canvas fixo de FLUXO_MAPA_CANVAS.w × .h (não depende da quantidade de
+// processos, ao contrário da tela de detalhamento).
+const FLUXO_MAPA_CANVAS = { w: 1360, h: 740 };
+
+const FLUXO_MAPA_NOS = [
+  { id: 'cad', tipo: 'processo', numero: 1, nome: 'CAD', x: 240, y: 235, w: 230, h: 58 },
+  { id: 'grc', tipo: 'processo', numero: 2, nome: 'GRC', x: 945, y: 118, w: 220, h: 58 },
+  { id: 'siscopen', tipo: 'processo', numero: 3, nome: 'Montagem Siscopen', x: 655, y: 312, w: 235, h: 58 },
+  { id: 'serralheria', tipo: 'processo', numero: 4, nome: 'Serralheria', x: 655, y: 38, w: 235, h: 58 },
+  { id: 'fastflex', tipo: 'processo', numero: 6, nome: 'Montagem Fastflex', x: 655, y: 450, w: 235, h: 58 },
+  { id: 'pesado', tipo: 'processo', numero: 6, nome: 'Montagem Pesado', x: 655, y: 598, w: 235, h: 58 },
+
+  { id: 'out-cad', tipo: 'saida', nome: 'Barreira visual\nPainel V\nPainel W\nLages', x: 545, y: 190, w: 165, h: 80 },
+  { id: 'out-grc', tipo: 'saida', nome: 'Mesa\nBanco\nCama', x: 1210, y: 116, w: 120, h: 62 },
+  { id: 'out-cela', tipo: 'saida', nome: 'Cela', x: 655, y: 388, w: 105, h: 34 },
+  { id: 'out-passarela', tipo: 'saida', nome: 'Passarela', x: 792, y: 388, w: 105, h: 34 },
+  { id: 'out-fastflex', tipo: 'saida', nome: 'Módulo Fastflex', x: 722, y: 524, w: 140, h: 34 },
+  { id: 'out-pesado', tipo: 'saida', nome: 'Módulo Pesado', x: 722, y: 672, w: 140, h: 34 }
+];
+
+const FLUXO_MAPA_LIGACOES = [
+  { de: 'cad', para: 'serralheria', rotulo: 'Ferragem\nInsert\nAlça\nChumbador\nGrades de Cela\nGrades de Passarela\nTubo de Reforço Aberturas' },
+  { de: 'cad', para: 'out-cad', rotulo: 'Luminária cela' },
+  { de: 'cad', para: 'siscopen', rotulo: 'MCC\nTeto\nPiso\nParede Direita\nParede Esquerda\nParede Porta\nParede Janela\nApoio de passarela\nVaso' },
+  { de: 'cad', para: 'siscopen', rotulo: 'MPA\nParede Janela\nParede Lisa\nPiso\nTeto' },
+  { de: 'serralheria', para: 'siscopen', rotulo: 'Mão-francesa' },
+  { de: 'serralheria', para: 'grc', rotulo: 'Ferragem da moldura\nInsert mesa/banco\nChumbador\nBastidor\nEPS' },
+  { de: 'serralheria', para: 'siscopen', rotulo: 'Moldura de cela\nMoldura de passarela' },
+  { de: 'grc', para: 'out-grc', rotulo: '' },
+  { de: 'grc', para: 'siscopen', rotulo: 'Móveis\nCapa de Cela\nCapa de Passarela\nSoleira' },
+  { de: 'grc', para: 'fastflex', rotulo: 'Estrutura de Teto de GRC\nStud Frame' },
+  { de: 'grc', para: 'pesado', rotulo: 'Teto de GRC' },
+  { de: 'siscopen', para: 'out-cela', rotulo: '' },
+  { de: 'siscopen', para: 'out-passarela', rotulo: '' },
+  { de: 'cad', para: 'fastflex', rotulo: 'Tubo de reforço do módulo\nAlças de içamento do módulo\nTubo de queda d\'água do teto\nAlça içamento do piso\nChapas de reforço do piso e do teto\nTubo de reforço cabeceira do piso\nMalha do piso Fastflex\nViga I4' },
+  { de: 'cad', para: 'fastflex', rotulo: 'Estrutura de Piso\nKit Hidráulico\nKit Elétrico' },
+  { de: 'cad', para: 'fastflex', rotulo: 'Piso Fastflex\nPainel Pesado\nVaso Direito\nVaso Esquerdo\nChicane\nCama Intima' },
+  { de: 'cad', para: 'pesado', rotulo: 'Tubo de reforço do módulo\nAlças de içamento do módulo' },
+  { de: 'fastflex', para: 'out-fastflex', rotulo: '' },
+  { de: 'pesado', para: 'out-pesado', rotulo: '' }
+];
+
+function fluxoMapaNo_(id) { return FLUXO_MAPA_NOS.find(n => n.id === id); }
+
+// Vários pares de nós têm mais de uma ligação (ex.: CAD → Montagem Fastflex tem 3 listas de
+// materiais diferentes) — sem isso, as linhas cairiam exatamente uma em cima da outra. Cada
+// ligação repetida do mesmo par ganha um índice (_offset) usado para afastar sua linha/rótulo
+// perpendicularmente das demais do mesmo par.
+(function fluxoMapaPrepararOffsets_() {
+  const contagem = {};
+  FLUXO_MAPA_LIGACOES.forEach(lig => {
+    const chave = [lig.de, lig.para].sort().join('__');
+    contagem[chave] = (contagem[chave] || 0) + 1;
+    lig._offset = contagem[chave] - 1;
+  });
+})();
+
+function fluxoMapaAncorasLig_(lig) {
+  const a = fluxoMapaNo_(lig.de), b = fluxoMapaNo_(lig.para);
+  if (!a || !b) return null;
+  const { p1, p2 } = fluxoMapaAncoras_(a, b);
+  const off = (lig._offset || 0) * 16;
+  if (!off) return { p1, p2 };
+  const horizontal = Math.abs(p1.y - p2.y) <= Math.abs(p1.x - p2.x);
+  return horizontal
+    ? { p1: { x: p1.x, y: p1.y + off }, p2: { x: p2.x, y: p2.y + off } }
+    : { p1: { x: p1.x + off, y: p1.y }, p2: { x: p2.x + off, y: p2.y } };
+}
+
+// Calcula os dois pontos de ancoragem (nas bordas dos retângulos) entre dois nós, escolhendo o
+// lado mais próximo conforme a posição relativa dos centros — não tenta reproduzir o traçado
+// exato do quadro original, só uma rota em ângulo reto legível.
+function fluxoMapaAncoras_(a, b) {
+  const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
+  const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  const dx = cb.x - ca.x, dy = cb.y - ca.y;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return {
+      p1: { x: dx > 0 ? a.x + a.w : a.x, y: ca.y },
+      p2: { x: dx > 0 ? b.x : b.x + b.w, y: cb.y }
+    };
+  }
+  return {
+    p1: { x: ca.x, y: dy > 0 ? a.y + a.h : a.y },
+    p2: { x: cb.x, y: dy > 0 ? b.y : b.y + b.h }
+  };
+}
+
+function fluxoMapaPath_(p1, p2) {
+  if (Math.abs(p1.y - p2.y) < 4 || Math.abs(p1.x - p2.x) < 4) return 'M' + p1.x + ',' + p1.y + ' L' + p2.x + ',' + p2.y;
+  const midX = (p1.x + p2.x) / 2;
+  return 'M' + p1.x + ',' + p1.y + ' L' + midX + ',' + p1.y + ' L' + midX + ',' + p2.y + ' L' + p2.x + ',' + p2.y;
+}
+
+function montarFluxoMapa() {
+  const canvas = document.getElementById('fluxoCanvas');
+  canvas.querySelectorAll('.fluxo-card, .fluxo-map-node, .fluxo-map-label').forEach(el => el.remove());
+  canvas.style.width = FLUXO_MAPA_CANVAS.w + 'px';
+  canvas.style.height = FLUXO_MAPA_CANVAS.h + 'px';
+
+  FLUXO_MAPA_NOS.forEach(no => {
+    const el = document.createElement(no.tipo === 'processo' ? 'button' : 'div');
+    el.className = 'fluxo-map-node ' + no.tipo + (no.tipo === 'processo' ? ' no-drag' : '');
+    el.style.left = no.x + 'px'; el.style.top = no.y + 'px'; el.style.width = no.w + 'px'; el.style.height = no.h + 'px';
+    if (no.tipo === 'processo') {
+      el.type = 'button';
+      el.dataset.setorNome = no.nome;
+      el.innerHTML = '<span class="fluxo-map-node-num">' + no.numero + '.</span><span class="fluxo-map-node-nome">' + esc(no.nome) + '</span>';
+    } else {
+      el.innerHTML = esc(no.nome).split('\n').join('<br>');
+    }
+    canvas.appendChild(el);
+  });
+
+  FLUXO_MAPA_LIGACOES.forEach(lig => {
+    if (!lig.rotulo) return;
+    const pontos = fluxoMapaAncorasLig_(lig);
+    if (!pontos) return;
+    const meio = fluxoMid(pontos.p1, pontos.p2);
+    const lbl = document.createElement('div');
+    lbl.className = 'fluxo-map-label';
+    lbl.style.left = Math.min(meio.x, FLUXO_MAPA_CANVAS.w - 170) + 'px';
+    lbl.style.top = meio.y + 'px';
+    lbl.innerHTML = esc(lig.rotulo).split('\n').join('<br>');
+    canvas.appendChild(lbl);
+  });
+
+  fluxoMapaDesenharLinhas_();
+  requestAnimationFrame(() => requestAnimationFrame(fluxoAjustarTela));
+}
+
+function fluxoMapaDesenharLinhas_() {
+  const svg = document.getElementById('fluxoConnectors');
+  while (svg.children.length > 1) svg.removeChild(svg.lastChild); // preserva <defs> (ponta da seta)
+  FLUXO_MAPA_LIGACOES.forEach(lig => {
+    const pontos = fluxoMapaAncorasLig_(lig);
+    if (!pontos) return;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('class', 'fluxo-conn-path');
+    path.setAttribute('marker-end', 'url(#fluxoArrowhead)');
+    path.setAttribute('d', fluxoMapaPath_(pontos.p1, pontos.p2));
+    svg.appendChild(path);
+  });
+  svg.setAttribute('width', FLUXO_MAPA_CANVAS.w);
+  svg.setAttribute('height', FLUXO_MAPA_CANVAS.h);
+}
+
+function fluxoLayout(processos) {
+  return processos.map((p, i) => {
+    const linha = Math.floor(i / 3);
+    const posNaLinha = i % 3;
+    const col = (linha % 2 === 0) ? posNaLinha : (2 - posNaLinha);
+    return Object.assign({}, p, { _x: FLUXO_COL_X[col], _y: 40 + linha * FLUXO_ROW_H });
+  });
+}
+
+function fluxoClassificarCobertura(pct) {
+  const critico = Number(cfgValor('COBERTURA_CRITICO_MAX', 30));
+  const atencao = Number(cfgValor('COBERTURA_ATENCAO_MAX', 60));
+  if (pct <= critico) return { label: 'Crítico', badge: 'badge-critico', cor: 'var(--vermelho)' };
+  if (pct <= atencao) return { label: 'Atenção', badge: 'badge-atencao', cor: 'var(--laranja)' };
+  return { label: 'Adequado', badge: 'badge-adequado', cor: 'var(--verde)' };
+}
+
+// Tipos de documento do card, na ordem em que aparecem (FTP acima, depois POP, depois PA).
+// abreDireto: true = clicar abre o PDF direto quando a pasta só tem 1 arquivo (senão mostra
+// a lista de seleção); false = sempre mostra a lista de seleção, mesmo com 1 arquivo só.
+const FLUXO_DOC_TIPOS = {
+  ftp: { rotulo: 'FTP', nomeCompleto: 'Folha de Trabalho Padronizado (FTP)', plural: false, abreDireto: true },
+  pop: { rotulo: 'POP', nomeCompleto: 'Procedimento Operacional Padrão', plural: false, abreDireto: true },
+  pa: { rotulo: 'PA', nomeCompleto: 'Pontos de Atenção', plural: true, abreDireto: false }
+};
+
+function fluxoDocChipHtml(p, tipo) {
+  const info = FLUXO_DOC_TIPOS[tipo];
+  const link = p[tipo.toUpperCase()];
+  if (!link) {
+    return '<div class="fluxo-doc-chip vazio"><span class="fluxo-doc-badge ' + tipo + '">' + info.rotulo + '</span>' +
+      '<span class="fluxo-doc-texto"><div class="fluxo-doc-titulo-doc">Não cadastrado</div>' +
+      '<div class="fluxo-doc-sub">' + info.nomeCompleto + '</div></span></div>';
+  }
+  return '<button type="button" class="fluxo-doc-chip no-drag" data-processo="' + esc(p.PROCESSO_ID) + '" data-doctipo="' + esc(tipo) + '">' +
+    '<span class="fluxo-doc-badge ' + tipo + '">' + info.rotulo + '</span>' +
+    '<span class="fluxo-doc-texto"><div class="fluxo-doc-titulo-doc">' + info.nomeCompleto + '</div>' +
+    '<div class="fluxo-doc-sub">Ver documento' + (info.plural ? 's' : '') + '</div></span>' + fluxoIconeIr() + '</button>';
+}
+
+function fluxoIconeIr() {
+  return '<span class="fluxo-doc-ir" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10 L10 4 M5 4 H10 V9"/></svg></span>';
+}
+
+// Lista de etapas do POP transcrita no fluxo produtivo (aba ETAPAS_POP) — informativa, sem
+// link/arquivo por trás (isso é o que o chip POP já faz). Só aparece no card quando o processo
+// tem pelo menos 1 etapa cadastrada; processos sem etapas não mostram nada aqui (não é campo
+// obrigatório como FTP/POP/PA).
+function fluxoEtapasHtml(etapas) {
+  const itens = etapas.map(e =>
+    '<li>' + (e.CODIGO_ETAPA ? '<span class="fluxo-etapa-cod">' + esc(e.CODIGO_ETAPA) + '</span>' : '') + esc(e.NOME_ETAPA) + '</li>'
+  ).join('');
+  return '<div class="fluxo-etapas"><div class="fluxo-etapas-titulo">Etapas do POP</div><ol class="fluxo-etapas-lista">' + itens + '</ol></div>';
+}
+
+function montarFluxoCanvas(processosBrutos, colaboradores, celulas, niveis, funcoes, etapasBrutas) {
+  const nivelMap = {}; niveis.forEach(n => nivelMap[Number(n.NIVEL_ID)] = n);
+  const funcaoMap = {}; funcoes.forEach(f => funcaoMap[f.FUNCAO_ID] = f);
+  const niveisCobrem = niveis.filter(n => n.COBRE_PROCESSO).map(n => Number(n.NIVEL_ID));
+  const menorNivelCobre = niveisCobrem.length ? Math.min.apply(null, niveisCobrem) : null;
+  const minSemRisco = Number(cfgValor('MIN_HABILITADOS_SEM_RISCO', 2));
+
+  const etapasPorProcesso = {};
+  (etapasBrutas || []).forEach(e => { (etapasPorProcesso[e.PROCESSO_ID] = etapasPorProcesso[e.PROCESSO_ID] || []).push(e); });
+  Object.keys(etapasPorProcesso).forEach(pid => etapasPorProcesso[pid].sort((a, b) => Number(a.ORDEM) - Number(b.ORDEM)));
+
+  const processos = fluxoLayout(processosBrutos);
+  FLUXO_STATIONS = processos;
+
+  const canvas = document.getElementById('fluxoCanvas');
+  canvas.querySelectorAll('.fluxo-card, .fluxo-map-node, .fluxo-map-label').forEach(el => el.remove());
+
+  processos.forEach((p, i) => {
+    const aptos = colaboradores.filter(c => c.FUNCAO_ID === p.FUNCAO_ID);
+    const operadores = aptos.map(c => {
+      const reg = celulas[c.COLABORADOR_ID] ? celulas[c.COLABORADOR_ID][p.PROCESSO_ID] : null;
+      return { nome: c.NOME, nivel: reg ? Number(reg.nivel) : 0 };
+    }).sort((a, b) => b.nivel - a.nivel || a.nome.localeCompare(b.nome));
+    const cobertos = operadores.filter(o => niveisCobrem.indexOf(o.nivel) > -1).length;
+    const pct = aptos.length ? Math.round((cobertos / aptos.length) * 100) : 0;
+    const tier = fluxoClassificarCobertura(pct);
+
+    const contagem = {};
+    operadores.forEach(o => { contagem[o.nivel] = (contagem[o.nivel] || 0) + 1; });
+    const barHtml = Object.keys(contagem).map(nv => {
+      const n = nivelMap[Number(nv)];
+      if (!n || !aptos.length) return '';
+      const w = (contagem[nv] / aptos.length * 100).toFixed(2);
+      return '<span style="width:' + w + '%;background:' + n.COR + '" title="' + esc(n.NOME) + ': ' + contagem[nv] + '"></span>';
+    }).join('');
+
+    const rosterHtml = operadores.map(o => {
+      const n = nivelMap[o.nivel];
+      return '<div class="fluxo-roster-row"><span class="fluxo-roster-dot" style="background:' + (n ? n.COR : '#9aa0a6') + '"></span>' +
+        '<span class="fluxo-roster-nome">' + esc(o.nome) + '</span>' +
+        '<span class="fluxo-roster-nivel">' + o.nivel + ' · ' + (n ? esc(n.NOME) : '') + '</span></div>';
+    }).join('') || '<div class="vazio" style="padding:10px;">Nenhum colaborador nesta função ainda.</div>';
+
+    const rotuloNivel = menorNivelCobre === null ? '' : ('nível ' + menorNivelCobre + '+ ');
+    const etapasP = etapasPorProcesso[p.PROCESSO_ID] || [];
+
+    const card = document.createElement('div');
+    card.className = 'fluxo-card';
+    card.style.setProperty('--tier-accent', tier.cor);
+    card.style.left = p._x + 'px';
+    card.style.top = p._y + 'px';
+    card.dataset.processoId = p.PROCESSO_ID;
+    card.innerHTML =
+      '<span class="fluxo-card-badge">' + (i + 1) + '</span>' +
+      (p.FTP_CODIGO ? '<span class="fluxo-card-cod" title="Código do FTP">' + esc(p.FTP_CODIGO) + '</span>' : '') +
+      '<button type="button" class="fluxo-card-nome no-drag" aria-expanded="false">' +
+        '<span>' + esc(p.NOME) + '</span><span class="chev">▾</span>' +
+      '</button>' +
+      '<p class="fluxo-card-desc">' + esc(funcaoMap[p.FUNCAO_ID] ? funcaoMap[p.FUNCAO_ID].NOME : '') + '</p>' +
+      '<div class="fluxo-doc-row">' + fluxoDocChipHtml(p, 'ftp') + fluxoDocChipHtml(p, 'pop') + fluxoDocChipHtml(p, 'pa') + '</div>' +
+      (etapasP.length ? fluxoEtapasHtml(etapasP) : '') +
+      '<button type="button" class="fluxo-stat no-drag" aria-expanded="false">' +
+        '<div class="fluxo-stat-top"><div class="fluxo-stat-num">' + cobertos + '/' + aptos.length + ' <span>' + rotuloNivel + '(' + pct + '%)</span></div>' +
+        '<span class="badge ' + tier.badge + '">' + tier.label + '</span></div>' +
+        '<div class="fluxo-stat-bar">' + barHtml + '</div>' +
+        (cobertos < minSemRisco ? '<div class="fluxo-risco"><strong>Atenção:</strong> menos de ' + minSemRisco + ' pessoa(s) no ' + rotuloNivel + '— risco de parada por ausência.</div>' : '') +
+      '</button>' +
+      '<div class="fluxo-roster no-drag" hidden>' + rosterHtml + '</div>';
+
+    canvas.appendChild(card);
+  });
+
+  fluxoDesenharConectores(processos);
+  requestAnimationFrame(() => requestAnimationFrame(fluxoAjustarTela));
+}
+
+function fluxoDesenharConectores(processos) {
+  const svg = document.getElementById('fluxoConnectors');
+  while (svg.children.length > 1) svg.removeChild(svg.lastChild); // preserva <defs> (ponta da seta)
+  for (let i = 0; i < processos.length - 1; i++) {
+    const a = processos[i], b = processos[i + 1];
+    const mesmaLinha = a._y === b._y;
+    let x1, y1, x2, y2;
+    if (mesmaLinha) {
+      const indoDireita = b._x > a._x;
+      x1 = indoDireita ? a._x + FLUXO_CARD_W : a._x; y1 = a._y + FLUXO_ANCHOR_TOP_Y;
+      x2 = indoDireita ? b._x : b._x + FLUXO_CARD_W; y2 = b._y + FLUXO_ANCHOR_TOP_Y;
+    } else {
+      x1 = a._x + FLUXO_CARD_W / 2; y1 = a._y + FLUXO_ANCHOR_DROP_Y;
+      x2 = b._x + FLUXO_CARD_W / 2; y2 = b._y;
+    }
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('class', 'fluxo-conn-path');
+    path.setAttribute('marker-end', 'url(#fluxoArrowhead)');
+    path.setAttribute('d', mesmaLinha ? ('M' + x1 + ',' + y1 + ' L' + x2 + ',' + y2)
+      : ('M' + x1 + ',' + y1 + ' L' + x1 + ',' + ((y1 + y2) / 2) + ' L' + x2 + ',' + ((y1 + y2) / 2) + ' L' + x2 + ',' + y2));
+    svg.appendChild(path);
+  }
+  let maxX = 0, maxY = 0;
+  processos.forEach(p => { maxX = Math.max(maxX, p._x + FLUXO_CARD_W); maxY = Math.max(maxY, p._y + 600); });
+  const w = maxX + 60, h = maxY + 60;
+  document.getElementById('fluxoCanvas').style.width = w + 'px';
+  document.getElementById('fluxoCanvas').style.height = h + 'px';
+  svg.setAttribute('width', w); svg.setAttribute('height', h);
+}
+
+function fluxoAlternarRoster(card) {
+  const nomeBtn = card.querySelector('.fluxo-card-nome');
+  const statBtn = card.querySelector('.fluxo-stat');
+  const roster = card.querySelector('.fluxo-roster');
+  const expandido = nomeBtn.getAttribute('aria-expanded') === 'true';
+  nomeBtn.setAttribute('aria-expanded', String(!expandido));
+  statBtn.setAttribute('aria-expanded', String(!expandido));
+  roster.hidden = expandido;
+}
+
+// ---------- pan & zoom (pointer events — cobre mouse, toque e caneta) ----------
+function fluxoAplicarTransform() {
+  document.getElementById('fluxoCanvas').style.transform = 'translate(' + FLUXO_PZ.tx + 'px,' + FLUXO_PZ.ty + 'px) scale(' + FLUXO_PZ.scale + ')';
+  document.getElementById('fluxoZoomHud').textContent = Math.round(FLUXO_PZ.scale * 100) + '%';
+}
+function fluxoClamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+function fluxoDist(p1, p2) { return Math.hypot(p1.x - p2.x, p1.y - p2.y); }
+function fluxoMid(p1, p2) { return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }; }
+
+function fluxoAjustarTela() {
+  const viewport = document.getElementById('fluxoViewport');
+  const canvas = document.getElementById('fluxoCanvas');
+  const rect = viewport.getBoundingClientRect();
+  const cw = canvas.offsetWidth || 1, ch = canvas.offsetHeight || 1;
+  const s = fluxoClamp(Math.min((rect.width - 48) / cw, (rect.height - 48) / ch), FLUXO_PZ.min, 1);
+  FLUXO_PZ.scale = s;
+  FLUXO_PZ.tx = (rect.width - cw * s) / 2;
+  FLUXO_PZ.ty = (rect.height - ch * s) / 2;
+  fluxoAplicarTransform();
+}
+
+function fluxoZoomPor(fator) {
+  FLUXO_PZ.userInteragiu = true;
+  const rect = document.getElementById('fluxoViewport').getBoundingClientRect();
+  const px = rect.width / 2, py = rect.height / 2;
+  const cx = (px - FLUXO_PZ.tx) / FLUXO_PZ.scale, cy = (py - FLUXO_PZ.ty) / FLUXO_PZ.scale;
+  const newScale = fluxoClamp(FLUXO_PZ.scale * fator, FLUXO_PZ.min, FLUXO_PZ.max);
+  FLUXO_PZ.tx = px - cx * newScale; FLUXO_PZ.ty = py - cy * newScale; FLUXO_PZ.scale = newScale;
+  fluxoAplicarTransform();
+}
+
+function fluxoIniciarInteracao() {
+  if (FLUXO_PZ.iniciado) return;
+  FLUXO_PZ.iniciado = true;
+  const viewport = document.getElementById('fluxoViewport');
+  const canvas = document.getElementById('fluxoCanvas');
+
+  viewport.addEventListener('pointerdown', e => {
+    if (e.target.closest('.no-drag')) return;
+    viewport.setPointerCapture(e.pointerId);
+    FLUXO_PZ.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    FLUXO_PZ.userInteragiu = true;
+    FLUXO_PZ.moveu = false;
+    if (FLUXO_PZ.pointers.size === 1) {
+      FLUXO_PZ.panStart = { tx: FLUXO_PZ.tx, ty: FLUXO_PZ.ty, px: e.clientX, py: e.clientY };
+      viewport.classList.add('dragging');
+    } else if (FLUXO_PZ.pointers.size === 2) {
+      const pts = Array.from(FLUXO_PZ.pointers.values());
+      FLUXO_PZ.pinchStart = { dist: fluxoDist(pts[0], pts[1]), scale: FLUXO_PZ.scale };
+    }
+  });
+
+  viewport.addEventListener('pointermove', e => {
+    if (!FLUXO_PZ.pointers.has(e.pointerId)) return;
+    FLUXO_PZ.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (FLUXO_PZ.pointers.size === 1 && FLUXO_PZ.panStart) {
+      if (fluxoDist({ x: e.clientX, y: e.clientY }, { x: FLUXO_PZ.panStart.px, y: FLUXO_PZ.panStart.py }) > 6) FLUXO_PZ.moveu = true;
+      FLUXO_PZ.tx = FLUXO_PZ.panStart.tx + (e.clientX - FLUXO_PZ.panStart.px);
+      FLUXO_PZ.ty = FLUXO_PZ.panStart.ty + (e.clientY - FLUXO_PZ.panStart.py);
+      fluxoAplicarTransform();
+    } else if (FLUXO_PZ.pointers.size === 2 && FLUXO_PZ.pinchStart) {
+      FLUXO_PZ.moveu = true;
+      const pts = Array.from(FLUXO_PZ.pointers.values());
+      const newDist = fluxoDist(pts[0], pts[1]);
+      const newScale = fluxoClamp(FLUXO_PZ.pinchStart.scale * (newDist / FLUXO_PZ.pinchStart.dist), FLUXO_PZ.min, FLUXO_PZ.max);
+      // Reancora no ponto médio ATUAL dos dois dedos (não no de quando o gesto começou), para
+      // acompanhar corretamente um gesto combinado de arrastar + beliscar (pan + zoom juntos).
+      const rect = viewport.getBoundingClientRect();
+      const midAgora = fluxoMid(pts[0], pts[1]);
+      const midLocal = { x: midAgora.x - rect.left, y: midAgora.y - rect.top };
+      const cx = (midLocal.x - FLUXO_PZ.tx) / FLUXO_PZ.scale;
+      const cy = (midLocal.y - FLUXO_PZ.ty) / FLUXO_PZ.scale;
+      FLUXO_PZ.tx = midLocal.x - cx * newScale;
+      FLUXO_PZ.ty = midLocal.y - cy * newScale;
+      FLUXO_PZ.scale = newScale;
+      fluxoAplicarTransform();
+    }
+  });
+
+  function encerrarPointer(e) {
+    FLUXO_PZ.pointers.delete(e.pointerId);
+    if (FLUXO_PZ.pointers.size === 0) {
+      FLUXO_PZ.panStart = null; FLUXO_PZ.pinchStart = null;
+      viewport.classList.remove('dragging');
+    } else if (FLUXO_PZ.pointers.size === 1) {
+      const p = Array.from(FLUXO_PZ.pointers.values())[0];
+      FLUXO_PZ.panStart = { tx: FLUXO_PZ.tx, ty: FLUXO_PZ.ty, px: p.x, py: p.y };
+      FLUXO_PZ.pinchStart = null;
+    }
+  }
+  viewport.addEventListener('pointerup', encerrarPointer);
+  viewport.addEventListener('pointercancel', encerrarPointer);
+  viewport.addEventListener('pointerleave', e => { if (FLUXO_PZ.pointers.has(e.pointerId)) encerrarPointer(e); });
+
+  viewport.addEventListener('wheel', e => {
+    e.preventDefault();
+    FLUXO_PZ.userInteragiu = true;
+    const rect = viewport.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const cx = (px - FLUXO_PZ.tx) / FLUXO_PZ.scale, cy = (py - FLUXO_PZ.ty) / FLUXO_PZ.scale;
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    const newScale = fluxoClamp(FLUXO_PZ.scale * factor, FLUXO_PZ.min, FLUXO_PZ.max);
+    FLUXO_PZ.tx = px - cx * newScale; FLUXO_PZ.ty = py - cy * newScale; FLUXO_PZ.scale = newScale;
+    fluxoAplicarTransform();
+  }, { passive: false });
+
+  let ultimoToque = { t: 0, x: 0, y: 0 };
+  viewport.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch' || e.target.closest('.no-drag')) return;
+    const agora = Date.now();
+    if (agora - ultimoToque.t < 300 && fluxoDist({ x: e.clientX, y: e.clientY }, ultimoToque) < 30) fluxoAjustarTela();
+    ultimoToque = { t: agora, x: e.clientX, y: e.clientY };
+  });
+  viewport.addEventListener('dblclick', e => { if (!e.target.closest('.no-drag')) fluxoAjustarTela(); });
+
+  document.getElementById('fluxoZoomIn').addEventListener('click', () => fluxoZoomPor(1.25));
+  document.getElementById('fluxoZoomOut').addEventListener('click', () => fluxoZoomPor(0.8));
+  document.getElementById('fluxoZoomFit').addEventListener('click', fluxoAjustarTela);
+
+  canvas.addEventListener('click', e => {
+    if (FLUXO_PZ.moveu) { FLUXO_PZ.moveu = false; return; } // ignora o "clique" fantasma no fim de um arraste/zoom
+    const noMapa = e.target.closest('.fluxo-map-node.processo');
+    if (noMapa) { fluxoAbrirSetor(noMapa.dataset.setorNome); return; }
+    const chip = e.target.closest('.fluxo-doc-chip:not(.vazio)');
+    if (chip) { fluxoAbrirDocumento(chip.dataset.processo, chip.dataset.doctipo); return; }
+    const trigger = e.target.closest('.fluxo-card-nome, .fluxo-stat');
+    if (trigger) fluxoAlternarRoster(trigger.closest('.fluxo-card'));
+  });
+
+  window.addEventListener('resize', () => { if (ESTADO.viewAtual === 'fluxo' && !FLUXO_PZ.userInteragiu) fluxoAjustarTela(); });
+
+  document.getElementById('fluxoDocFechar').addEventListener('click', fluxoFecharTopo);
+  document.getElementById('fluxoDocOverlay').addEventListener('click', e => { if (e.target.id === 'fluxoDocOverlay') fluxoFecharTopo(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && FLUXO_DOC_STACK.length) fluxoFecharTopo(); });
+  document.getElementById('fluxoDocBody').addEventListener('click', e => {
+    const item = e.target.closest('.fluxo-doc-pick-item');
+    if (!item) return;
+    const topo = FLUXO_DOC_STACK[FLUXO_DOC_STACK.length - 1];
+    const doc = topo.itens[Number(item.dataset.index)];
+    fluxoPushModal({ tipo: 'visualizador', doc, caminho: topo.caminho });
+  });
+}
+
+// ---------- visualizador / seletor de documentos (pilha: X/Esc fecha só o topo) ----------
+async function fluxoAbrirDocumento(processoId, tipo) {
+  const processo = FLUXO_STATIONS.find(p => p.PROCESSO_ID === processoId);
+  if (!processo) return;
+  const info = FLUXO_DOC_TIPOS[tipo];
+  const link = processo[tipo.toUpperCase()];
+  if (!link) return;
+  let arquivos;
+  try {
+    arquivos = await callServer('listarArquivosPasta', link);
+  } catch (e) { return; } // erro de acesso à pasta já foi mostrado pelo callServer (toast)
+  const caminho = processo.NOME + ' / ' + info.rotulo;
+  if (!arquivos.length) { toast('Nenhum PDF encontrado nessa pasta do Drive.', 'erro'); return; }
+  if (info.abreDireto && arquivos.length === 1) fluxoPushModal({ tipo: 'visualizador', doc: arquivos[0], caminho });
+  else fluxoPushModal({ tipo: 'seletor', itens: arquivos, caminho, docTipo: tipo });
+}
+
+function fluxoIdArquivoDrive(url) {
+  const m = String(url || '').match(/[-\w]{25,}/);
+  return m ? m[0] : '';
+}
+
+function fluxoIconeArquivo() {
+  return '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"><path d="M4 1.5h5l3 3v10h-8z"/><path d="M9 1.5v3h3"/></svg>';
+}
+
+function fluxoRenderModal() {
+  const overlay = document.getElementById('fluxoDocOverlay');
+  const titulo = document.getElementById('fluxoDocTitulo');
+  const body = document.getElementById('fluxoDocBody');
+  const topo = FLUXO_DOC_STACK[FLUXO_DOC_STACK.length - 1];
+  if (!topo) { overlay.classList.remove('show'); body.innerHTML = ''; return; }
+  overlay.classList.add('show');
+  if (topo.tipo === 'visualizador') {
+    titulo.textContent = topo.doc.nome;
+    const idArq = topo.doc.id || fluxoIdArquivoDrive(topo.doc.url);
+    body.innerHTML =
+      '<p class="fluxo-doc-caminho">' + esc(topo.caminho) + '</p>' +
+      (idArq ? '<iframe class="fluxo-doc-pdf-frame" src="https://drive.google.com/file/d/' + esc(idArq) + '/preview" allow="autoplay"></iframe>' : '') +
+      '<a class="fluxo-doc-abrir" href="' + esc(topo.doc.url) + '" target="_blank" rel="noopener">Abrir no Google Drive ↗</a>';
+  } else {
+    titulo.textContent = FLUXO_DOC_TIPOS[topo.docTipo] ? FLUXO_DOC_TIPOS[topo.docTipo].nomeCompleto : '';
+    const itensHtml = topo.itens.map((doc, i) =>
+      '<button type="button" class="fluxo-doc-pick-item" data-index="' + i + '">' + fluxoIconeArquivo() + '<span>' + esc(doc.nome) + '</span></button>'
+    ).join('');
+    body.innerHTML =
+      '<p class="fluxo-doc-caminho">' + esc(topo.caminho) + '</p>' +
+      '<p class="fluxo-doc-pick-hint">' + topo.itens.length + ' documento(s). Selecione qual abrir:</p>' +
+      itensHtml;
+  }
+}
+function fluxoPushModal(view) { FLUXO_DOC_STACK.push(view); fluxoRenderModal(); }
+function fluxoFecharTopo() { FLUXO_DOC_STACK.pop(); fluxoRenderModal(); }
