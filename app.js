@@ -190,8 +190,6 @@ function ligarEventosGlobais() {
   document.getElementById('menuToggle').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
   document.getElementById('btnAplicarFiltros').addEventListener('click', aplicarFiltrosGlobais);
   document.getElementById('btnLimparFiltros').addEventListener('click', limparFiltrosGlobais);
-  document.getElementById('fSetor').addEventListener('change', onFiltroSetorChange);
-
   let buscaTimer;
   document.getElementById('inputBuscaGlobal').addEventListener('input', e => {
     clearTimeout(buscaTimer);
@@ -215,7 +213,6 @@ function ligarEventosGlobais() {
   });
 
   document.getElementById('btnNovoSetor').addEventListener('click', () => abrirModalGenerico('setor', null));
-  document.getElementById('btnNovaArea').addEventListener('click', () => abrirModalGenerico('area', null));
   document.getElementById('btnNovaFuncao').addEventListener('click', () => abrirModalGenerico('funcao', null));
   document.getElementById('btnNovoProcesso').addEventListener('click', () => abrirModalGenerico('processo', null));
   document.getElementById('btnNovoUsuario').addEventListener('click', () => abrirModalGenerico('usuario', null));
@@ -286,7 +283,6 @@ function popularFiltros() {
   preencherSelect('fTurno', ESTADO.boot.turnos.map(t => ({ v: t, n: t })), 'v', 'n');
   preencherSelect('fStatus', ESTADO.boot.statusColaborador.map(s => ({ v: s, n: s })), 'v', 'n');
   preencherSelect('fNivel', e.niveis, 'NIVEL_ID', 'NOME');
-  onFiltroSetorChange();
 }
 
 function preencherSelect(id, arr, campoValor, campoNome, manterPrimeira) {
@@ -301,16 +297,9 @@ function preencherSelect(id, arr, campoValor, campoNome, manterPrimeira) {
   });
 }
 
-function onFiltroSetorChange() {
-  const setorId = document.getElementById('fSetor').value;
-  const areas = ESTADO.boot.estrutura.areas.filter(a => !setorId || a.SETOR_ID === setorId);
-  preencherSelect('fArea', areas, 'AREA_ID', 'NOME');
-}
-
 function lerFiltrosGlobais() {
   return {
     setorId: document.getElementById('fSetor').value,
-    areaId: document.getElementById('fArea').value,
     funcaoId: document.getElementById('fFuncao').value,
     turno: document.getElementById('fTurno').value,
     processoId: document.getElementById('fProcesso').value,
@@ -325,7 +314,7 @@ async function aplicarFiltrosGlobais() {
 }
 
 async function limparFiltrosGlobais() {
-  ['fSetor', 'fArea', 'fFuncao', 'fTurno', 'fProcesso', 'fNivel', 'fStatus'].forEach(id => document.getElementById(id).value = '');
+  ['fSetor', 'fFuncao', 'fTurno', 'fProcesso', 'fNivel', 'fStatus'].forEach(id => document.getElementById(id).value = '');
   ESTADO.filtro = {};
   await trocarView(ESTADO.viewAtual);
 }
@@ -515,7 +504,6 @@ function abrirModalColaborador(c) {
   document.getElementById('modalColaboradorTitulo').textContent = c ? 'Editar colaborador' : 'Novo colaborador';
   const e = ESTADO.boot.estrutura;
   const optSetores = e.setores.map(s => ({ v: s.SETOR_ID, n: s.NOME }));
-  const optAreas = e.areas.filter(a => !c || a.SETOR_ID === c.SETOR_ID).map(a => ({ v: a.AREA_ID, n: a.NOME }));
   const optFuncoes = e.funcoes.map(f => ({ v: f.FUNCAO_ID, n: f.NOME }));
   const optTurnos = ESTADO.boot.turnos.map(t => ({ v: t, n: t }));
   const optStatus = ESTADO.boot.statusColaborador.map(s => ({ v: s, n: s }));
@@ -527,9 +515,7 @@ function abrirModalColaborador(c) {
     campoHtml('Nome completo', 'colNome', 'text', null, c && c.NOME) +
     campoHtml('CPF', 'colCpf', 'text', null, c && c.CPF) +
     campoHtml('Setor', 'colSetor', 'select', optSetores, c && c.SETOR_ID) +
-    campoHtml('Área', 'colArea', 'select', optAreas, c && c.AREA_ID) +
     campoHtml('Função', 'colFuncao', 'select', optFuncoes, c && c.FUNCAO_ID) +
-    campoHtml('Cargo', 'colCargo', 'text', null, c && c.CARGO) +
     campoHtml('Turno', 'colTurno', 'select', optTurnos, c && c.TURNO) +
     campoHtml('Líder', 'colLider', 'select', optLideres, c && c.LIDER_ID) +
     campoHtml('Data de admissão', 'colAdmissao', 'date', null, c && c.DATA_ADMISSAO) +
@@ -538,10 +524,6 @@ function abrirModalColaborador(c) {
     campoHtml('Observações', 'colObs', 'textarea', null, c && c.OBSERVACOES, true) +
     campoHtml('Foto (URL, opcional)', 'colFoto', 'text', null, c && c.FOTO_URL, true);
 
-  document.getElementById('colSetor').addEventListener('change', function () {
-    const areas = e.areas.filter(a => a.SETOR_ID === this.value).map(a => ({ v: a.AREA_ID, n: a.NOME }));
-    preencherSelectEl(document.getElementById('colArea'), areas);
-  });
   abrirModal('modalColaborador');
 }
 function preencherSelectEl(sel, opcoes) { sel.innerHTML = opcoes.map(o => '<option value="' + esc(o.v) + '">' + esc(o.n) + '</option>').join(''); }
@@ -550,7 +532,7 @@ async function salvarColaboradorForm() {
   const item = {
     COLABORADOR_ID: ESTADO.colaboradorEditando || '',
     MATRICULA: val('colMatricula'), NOME: val('colNome'), CPF: val('colCpf'),
-    SETOR_ID: val('colSetor'), AREA_ID: val('colArea'), FUNCAO_ID: val('colFuncao'), CARGO: val('colCargo'),
+    SETOR_ID: val('colSetor'), FUNCAO_ID: val('colFuncao'),
     TURNO: val('colTurno'), LIDER_ID: val('colLider'), DATA_ADMISSAO: val('colAdmissao'),
     STATUS: val('colStatus'), DATA_DESLIGAMENTO: val('colDesligamento'), OBSERVACOES: val('colObs'), FOTO_URL: val('colFoto')
   };
@@ -571,7 +553,7 @@ async function verFichaColaborador(id) {
   document.getElementById('modalFichaCorpo').innerHTML =
     '<div class="grid-2">' +
       '<div><p><b>Função:</b> ' + esc(f.funcao ? f.funcao.NOME : '') + '<br><b>Setor:</b> ' + esc(f.setor ? f.setor.NOME : '') +
-      '<br><b>Área:</b> ' + esc(f.area ? f.area.NOME : '') + '<br><b>Líder:</b> ' + esc(f.lider ? f.lider.NOME : '-') + '<br><b>Turno:</b> ' + esc(f.colaborador.TURNO) + '</p></div>' +
+      '<br><b>Líder:</b> ' + esc(f.lider ? f.lider.NOME : '-') + '<br><b>Turno:</b> ' + esc(f.colaborador.TURNO) + '</p></div>' +
       '<div>' + kpiCardHtml(ind.indice + '%', 'Índice de versatilidade — ' + cl.label, '', '🧩') + '</div>' +
     '</div>' +
     '<div class="grid-kpis" style="margin-top:10px;">' +
@@ -815,7 +797,6 @@ async function salvarPlanoForm() {
 async function renderProcessos() {
   const e = ESTADO.boot.estrutura;
   document.getElementById('listaSetores').innerHTML = listaCrudHtml(e.setores, 'SETOR_ID', 'NOME', 'setor');
-  document.getElementById('listaAreas').innerHTML = listaCrudHtml(e.areas, 'AREA_ID', 'NOME', 'area');
   document.getElementById('listaFuncoes').innerHTML = listaCrudHtml(e.funcoes, 'FUNCAO_ID', 'NOME', 'funcao');
   document.getElementById('listaProcessos').innerHTML = listaCrudHtml(e.processos, 'PROCESSO_ID', 'NOME', 'processo');
 
@@ -847,7 +828,6 @@ function listaCrudHtml(itens, idCampo, nomeCampo, tipo) {
 
 const CONFIG_GENERICO = {
   setor: { titulo: 'Setor', salvar: 'salvarSetor', campos: [['NOME', 'Nome', 'text']] },
-  area: { titulo: 'Área', salvar: 'salvarArea', campos: [['SETOR_ID', 'Setor', 'select-setor'], ['NOME', 'Nome', 'text']] },
   funcao: { titulo: 'Função', salvar: 'salvarFuncao', campos: [['SETOR_ID', 'Setor', 'select-setor'], ['NOME', 'Nome', 'text']] },
   processo: { titulo: 'Processo / Competência', salvar: 'salvarProcesso', campos: [['FUNCAO_ID', 'Função', 'select-funcao'], ['NOME', 'Nome', 'text'],
     ['FTP_CODIGO', 'Código do FTP (ex.: F1000 — opcional)', 'text'],
@@ -862,7 +842,7 @@ function abrirModalGenerico(tipo, id) {
   document.getElementById('modalGenericoTitulo').textContent = (id ? 'Editar ' : 'Novo ') + cfg.titulo;
   let itemAtual = null;
   if (id) {
-    const listaOrigem = { setor: 'setores', area: 'areas', funcao: 'funcoes', processo: 'processos' }[tipo];
+    const listaOrigem = { setor: 'setores', funcao: 'funcoes', processo: 'processos' }[tipo];
     if (listaOrigem) itemAtual = ESTADO.boot.estrutura[listaOrigem].find(x => x[Object.keys(x)[0]] === id);
   }
   document.getElementById('formGenerico').innerHTML = cfg.campos.map(([campo, label, tipoCampo]) => {
@@ -884,7 +864,7 @@ async function salvarGenerico() {
   const tipo = ESTADO.genericoTipo, cfg = CONFIG_GENERICO[tipo];
   const criandoUsuarioNovo = tipo === 'usuario' && !ESTADO.genericoId;
   const item = {};
-  const idCampoMap = { setor: 'SETOR_ID', area: 'AREA_ID', funcao: 'FUNCAO_ID', processo: 'PROCESSO_ID', usuario: 'USUARIO_ID' };
+  const idCampoMap = { setor: 'SETOR_ID', funcao: 'FUNCAO_ID', processo: 'PROCESSO_ID', usuario: 'USUARIO_ID' };
   item[idCampoMap[tipo]] = ESTADO.genericoId || '';
   cfg.campos.forEach(([campo, , tipoCampo]) => {
     let v = val('gen_' + campo);
