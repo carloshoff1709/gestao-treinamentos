@@ -48,6 +48,7 @@
   <aside id="sidebar">
     <div class="logo"><img src="img/logo-branco.png" alt="Visia" style="height:30px;width:auto;"> <div><div id="nomeEmpresaSidebar">Gestão de Treinamentos</div><span class="sub">Matriz de Versatilidade</span></div></div>
     <nav id="navMenu">
+      <div class="nav-item" data-view="fluxo"><span class="ic">🧭</span> Fluxo e Documentos</div>
       <div class="nav-item active" data-view="dashboard"><span class="ic">🏠</span> Dashboard</div>
       <div class="nav-item" data-view="executivo"><span class="ic">📈</span> Dashboard Executivo</div>
       <div class="nav-item" data-view="colaboradores"><span class="ic">👥</span> Colaboradores</div>
@@ -98,6 +99,40 @@
         <button class="btn" id="btnLimparFiltros">✕ Limpar filtros</button>
         <button class="btn btn-primary" id="btnAplicarFiltros">Aplicar filtros</button>
       </div>
+
+      <!-- =========== FLUXO E DOCUMENTOS (FTP/POP/PA + matriz de versatilidade) =========== -->
+      <section class="view" id="view-fluxo">
+        <div class="fluxo-toolbar no-print">
+          <button type="button" class="btn btn-sm fluxo-btn-voltar" id="fluxoVoltarMapa" hidden>&larr; Fluxo principal</button>
+          <div class="fluxo-toolbar-setor" id="fluxoToolbarSetor" hidden>
+            <div class="campo-filtro"><label>Setor</label><select id="fluxoSetor"></select></div>
+            <div class="fluxo-legenda" id="fluxoLegenda"></div>
+          </div>
+        </div>
+        <div class="vazio" id="fluxoVazio" style="display:none;">Nenhum processo cadastrado para este setor ainda.</div>
+        <div id="fluxoConteudo">
+          <p class="fluxo-hint" id="fluxoHint">Arraste para navegar · roda do mouse ou pinça para zoom · duplo clique/toque centraliza</p>
+          <div class="fluxo-viewport" id="fluxoViewport">
+            <div class="fluxo-canvas" id="fluxoCanvas">
+              <svg class="fluxo-connectors" id="fluxoConnectors">
+                <defs>
+                  <marker id="fluxoArrowhead" markerWidth="11" markerHeight="11" refX="7.5" refY="4" orient="auto">
+                    <path class="fluxo-conn-arrow" d="M0,0 L8,4 L0,8 Z"></path>
+                  </marker>
+                </defs>
+              </svg>
+            </div>
+            <div class="fluxo-zoom-hud" id="fluxoZoomHud">100%</div>
+            <div class="fluxo-zoom-controls no-drag no-print">
+              <button class="fluxo-zoom-btn" id="fluxoZoomIn" type="button" aria-label="Aproximar">+</button>
+              <button class="fluxo-zoom-btn" id="fluxoZoomOut" type="button" aria-label="Afastar">–</button>
+              <button class="fluxo-zoom-btn" id="fluxoZoomFit" type="button" aria-label="Ajustar à tela">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 6 V2 H6 M10 2 H14 V6 M14 10 V14 H10 M6 14 H2 V10"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- =========== DASHBOARD GERENCIAL =========== -->
       <section class="view active" id="view-dashboard">
@@ -386,6 +421,18 @@
       <button class="btn" onclick="fecharModal('modalSenha')">Cancelar</button>
       <button class="btn btn-primary" id="btnSalvarSenha">Salvar</button>
     </div>
+  </div>
+</div>
+
+<!-- =========== FLUXO: VISUALIZADOR / SELETOR DE DOCUMENTOS (FTP/POP/PA) =========== -->
+<!-- Pilha de telas: o X (ou Esc) fecha só a tela do topo e volta para a anterior. -->
+<div class="fluxo-doc-overlay" id="fluxoDocOverlay">
+  <div class="fluxo-doc-modal" role="dialog" aria-modal="true" aria-labelledby="fluxoDocTitulo">
+    <div class="fluxo-doc-head">
+      <span class="fluxo-doc-titulo" id="fluxoDocTitulo"></span>
+      <button class="fluxo-doc-fechar" id="fluxoDocFechar" type="button" aria-label="Fechar e voltar">✕</button>
+    </div>
+    <div class="fluxo-doc-body" id="fluxoDocBody"></div>
   </div>
 </div>
 
