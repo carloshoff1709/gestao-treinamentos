@@ -494,6 +494,23 @@ function campoHtml(label, id, tipo, opcoes, valor, span2) {
   return '<div class="campo' + (span2 ? ' span2' : '') + '"><label>' + label + '</label>' + input + '</div>';
 }
 
+/**
+ * Lista de checkboxes (não um <select multiple>, mais fácil de usar em touch) para escolher
+ * mais de uma opção ao mesmo tempo. Usado hoje só na criação de um Processo novo, para marcar
+ * mais de uma Função de uma vez (ver comentário em abrirModalGenerico/salvarGenerico).
+ */
+function campoChecklistHtml(label, grupo, opcoes, span2) {
+  const linhas = (opcoes || []).map(o =>
+    '<label class="chk-item"><input type="checkbox" data-grupo="' + grupo + '" value="' + esc(o.v) + '"> ' + esc(o.n) + '</label>'
+  ).join('');
+  return '<div class="campo' + (span2 ? ' span2' : '') + '"><label>' + label + '</label><div class="chk-lista">' + linhas + '</div></div>';
+}
+
+/** Devolve os valores marcados de um campoChecklistHtml (ver acima), pelo mesmo "grupo". */
+function valMulti(grupo) {
+  return Array.prototype.slice.call(document.querySelectorAll('input[data-grupo="' + grupo + '"]:checked')).map(el => el.value);
+}
+
 function abrirModalColaboradorId(id) {
   const c = ESTADO.ultimoColaboradores ? ESTADO.ultimoColaboradores[id] : null;
   callServer('getColaborador', id).then(c2 => abrirModalColaborador(c2));
@@ -849,7 +866,17 @@ function abrirModalGenerico(tipo, id) {
     const id_ = 'gen_' + campo;
     const valorAtual = itemAtual ? itemAtual[campo] : '';
     if (tipoCampo === 'select-setor') return campoHtml(label, id_, 'select', ESTADO.boot.estrutura.setores.map(s => ({ v: s.SETOR_ID, n: s.NOME })), valorAtual);
-    if (tipoCampo === 'select-funcao') return campoHtml(label, id_, 'select', ESTADO.boot.estrutura.funcoes.map(f => ({ v: f.FUNCAO_ID, n: f.NOME })), valorAtual);
+    if (tipoCampo === 'select-funcao') {
+      // Criando um Processo novo (sem id ainda): permite marcar mais de uma Função de uma vez —
+      // o sistema cria uma linha de Processo por Função marcada (mesmo Nome, mesmo FTP/POP/PA),
+      // em vez de o usuário repetir o cadastro manualmente para cada Função. Editando uma linha
+      // que já existe, continua sendo 1 linha = 1 Função (seleção única), porque é isso que o
+      // PROCESSO_ID daquela linha já representa.
+      if (tipo === 'processo' && !id) {
+        return campoChecklistHtml('Função(ões) — marque uma ou mais; cria uma linha de Processo para cada uma', 'gen_FUNCAO_ID_MULTI', ESTADO.boot.estrutura.funcoes.map(f => ({ v: f.FUNCAO_ID, n: f.NOME })), true);
+      }
+      return campoHtml(label, id_, 'select', ESTADO.boot.estrutura.funcoes.map(f => ({ v: f.FUNCAO_ID, n: f.NOME })), valorAtual);
+    }
     if (tipoCampo === 'select-perfil') return campoHtml(label, id_, 'select', ESTADO.boot.perfis.map(p => ({ v: p, n: p })), valorAtual || 'Visualização');
     if (tipoCampo === 'select-bool') return campoHtml(label, id_, 'select', [{ v: 'true', n: 'Sim' }, { v: 'false', n: 'Não' }], valorAtual === false ? 'false' : 'true');
     // Campo de senha inicial: só faz sentido ao CRIAR um usuário novo (id ausente). Ao editar,
@@ -863,17 +890,35 @@ function abrirModalGenerico(tipo, id) {
 async function salvarGenerico() {
   const tipo = ESTADO.genericoTipo, cfg = CONFIG_GENERICO[tipo];
   const criandoUsuarioNovo = tipo === 'usuario' && !ESTADO.genericoId;
+  // Criando um Processo novo (não editando um já existente): a Função vem de uma checklist de
+  // múltipla seleção (ver abrirModalGenerico), não de um <select> comum — tratada à parte abaixo.
+  const criandoProcessoNovo = tipo === 'processo' && !ESTADO.genericoId;
   const item = {};
   const idCampoMap = { setor: 'SETOR_ID', funcao: 'FUNCAO_ID', processo: 'PROCESSO_ID', usuario: 'USUARIO_ID' };
   item[idCampoMap[tipo]] = ESTADO.genericoId || '';
   cfg.campos.forEach(([campo, , tipoCampo]) => {
+    if (criandoProcessoNovo && campo === 'FUNCAO_ID') return;
     let v = val('gen_' + campo);
     if (tipoCampo === 'select-bool') v = v === 'true';
     item[campo] = v;
   });
+  if (criandoProcessoNovo) {
+    item.FUNCOES_IDS = valMulti('gen_FUNCAO_ID_MULTI');
+    if (!item.FUNCOES_IDS.length) { toast('Selecione ao menos uma função.', 'erro'); return; }
+  }
   try {
-    const resultado = await callServer(cfg.salvar, item);
-    toast(cfg.titulo + ' salvo com sucesso.', 'sucesso');
+    const resultado = await callServer(criandoProcessoNovo ? 'salvarProcessoComFuncoes' : cfg.salvar, item);
+    if (criandoProcessoNovo) {
+      const msg = resultado.total === 1
+        ? 'Processo salvo com sucesso.'
+        : resultado.total + ' linhas de processo criadas com sucesso (uma para cada função selecionada).';
+      toast(msg, 'sucesso');
+      if (resultado.erros && resultado.erros.length) {
+        toast(resultado.erros.length + ' função(ões) não geraram linha nova (' + resultado.erros.map(e => e.mensagem).join('; ') + ').', 'erro');
+      }
+    } else {
+      toast(cfg.titulo + ' salvo com sucesso.', 'sucesso');
+    }
     fecharModal('modalGenerico');
     ESTADO.boot.estrutura = await callServer('getEstruturaCompleta');
     popularFiltros();
@@ -1209,141 +1254,46 @@ const FLUXO_MAPA_NOS = [
   { id: 'out-pesado', tipo: 'saida', nome: 'Módulo Pesado', x: 790, y: 816, w: 140, h: 34 }
 ];
 
-const FLUXO_MAPA_LIGACOES = [
-  { de: 'cad', para: 'serralheria', rotulo: 'Ferragem\nInsert\nAlça\nChumbador\nGrades de Cela\nGrades de Passarela\nTubo de Reforço Aberturas', lx: 330, ly: 130 },
-  { de: 'cad', para: 'out-cad', rotulo: 'Luminária cela', lx: 420, ly: 320 },
-  { de: 'cad', para: 'siscopen', rotulo: 'MCC\nTeto\nPiso\nParede Direita\nParede Esquerda\nParede Porta\nParede Janela\nApoio de passarela\nVaso', lx: 340, ly: 430 },
-  { de: 'cad', para: 'siscopen', rotulo: 'MPA\nParede Janela\nParede Lisa\nPiso\nTeto', lx: 340, ly: 640 },
-  { de: 'serralheria', para: 'siscopen', rotulo: 'Mão-francesa', lx: 790, ly: 220 },
-  { de: 'serralheria', para: 'grc', rotulo: 'Ferragem da moldura\nInsert mesa/banco\nChumbador\nBastidor\nEPS', lx: 960, ly: 20 },
-  { de: 'serralheria', para: 'siscopen', rotulo: 'Moldura de cela\nMoldura de passarela', lx: 790, ly: 150 },
-  { de: 'grc', para: 'out-grc', rotulo: '' },
-  { de: 'grc', para: 'siscopen', rotulo: 'Móveis\nCapa de Cela\nCapa de Passarela\nSoleira', lx: 1010, ly: 260 },
-  { de: 'grc', para: 'fastflex', rotulo: 'Estrutura de Teto de GRC\nStud Frame', lx: 1010, ly: 470 },
-  { de: 'grc', para: 'pesado', rotulo: 'Teto de GRC', lx: 1010, ly: 650 },
-  { de: 'siscopen', para: 'out-cela', rotulo: '' },
-  { de: 'siscopen', para: 'out-passarela', rotulo: '' },
-  { de: 'cad', para: 'fastflex', rotulo: 'Tubo de reforço do módulo\nAlças de içamento do módulo\nTubo de queda d\'água do teto\nAlça içamento do piso\nChapas de reforço do piso e do teto\nTubo de reforço cabeceira do piso\nMalha do piso Fastflex\nViga I4', lx: 20, ly: 20 },
-  { de: 'cad', para: 'fastflex', rotulo: 'Estrutura de Piso\nKit Hidráulico\nKit Elétrico', lx: 20, ly: 470 },
-  { de: 'cad', para: 'fastflex', rotulo: 'Piso Fastflex\nPainel Pesado\nVaso Direito\nVaso Esquerdo\nChicane\nCama Intima', lx: 20, ly: 620 },
-  { de: 'cad', para: 'pesado', rotulo: 'Tubo de reforço do módulo\nAlças de içamento do módulo', lx: 20, ly: 800 },
-  { de: 'fastflex', para: 'out-fastflex', rotulo: '' },
-  { de: 'pesado', para: 'out-pesado', rotulo: '' }
-];
-
-function fluxoMapaNo_(id) { return FLUXO_MAPA_NOS.find(n => n.id === id); }
-
-// Vários pares de nós têm mais de uma ligação (ex.: CAD → Montagem Fastflex tem 3 listas de
-// materiais diferentes) — sem isso, as linhas cairiam exatamente uma em cima da outra. Cada
-// ligação repetida do mesmo par ganha um índice (_offset) usado para afastar sua linha/rótulo
-// perpendicularmente das demais do mesmo par.
-(function fluxoMapaPrepararOffsets_() {
-  const contagem = {};
-  FLUXO_MAPA_LIGACOES.forEach(lig => {
-    const chave = [lig.de, lig.para].sort().join('__');
-    contagem[chave] = (contagem[chave] || 0) + 1;
-    lig._offset = contagem[chave] - 1;
-  });
-})();
-
-function fluxoMapaAncorasLig_(lig) {
-  const a = fluxoMapaNo_(lig.de), b = fluxoMapaNo_(lig.para);
-  if (!a || !b) return null;
-  const { p1, p2 } = fluxoMapaAncoras_(a, b);
-  const off = (lig._offset || 0) * 16;
-  if (!off) return { p1, p2 };
-  const horizontal = Math.abs(p1.y - p2.y) <= Math.abs(p1.x - p2.x);
-  return horizontal
-    ? { p1: { x: p1.x, y: p1.y + off }, p2: { x: p2.x, y: p2.y + off } }
-    : { p1: { x: p1.x + off, y: p1.y }, p2: { x: p2.x + off, y: p2.y } };
-}
-
-// Calcula os dois pontos de ancoragem (nas bordas dos retângulos) entre dois nós, escolhendo o
-// lado mais próximo conforme a posição relativa dos centros — não tenta reproduzir o traçado
-// exato do quadro original, só uma rota em ângulo reto legível.
-function fluxoMapaAncoras_(a, b) {
-  const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
-  const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
-  const dx = cb.x - ca.x, dy = cb.y - ca.y;
-  if (Math.abs(dx) > Math.abs(dy)) {
-    return {
-      p1: { x: dx > 0 ? a.x + a.w : a.x, y: ca.y },
-      p2: { x: dx > 0 ? b.x : b.x + b.w, y: cb.y }
-    };
-  }
-  return {
-    p1: { x: ca.x, y: dy > 0 ? a.y + a.h : a.y },
-    p2: { x: cb.x, y: dy > 0 ? b.y : b.y + b.h }
-  };
-}
-
-function fluxoMapaPath_(p1, p2) {
-  if (Math.abs(p1.y - p2.y) < 4 || Math.abs(p1.x - p2.x) < 4) return 'M' + p1.x + ',' + p1.y + ' L' + p2.x + ',' + p2.y;
-  const midX = (p1.x + p2.x) / 2;
-  return 'M' + p1.x + ',' + p1.y + ' L' + midX + ',' + p1.y + ' L' + midX + ',' + p2.y + ' L' + p2.x + ',' + p2.y;
-}
-
+// A partir desta rodada ("travar a imagem do mapa"), o fluxo principal deixou de ser desenhado
+// dinamicamente (retângulos + linhas SVG a partir de FLUXO_MAPA_LIGACOES) e passou a ser uma
+// imagem estática pré-renderizada (img/fluxo-mapa-principal.png, mesma arte e mesmas cores desta
+// tela há vários rodadas, só que agora congelada em bitmap). Motivo: em alguns navegadores/SO com
+// modo escuro forçado, o texto desenhado ao vivo no mapa ficava quase ilegível (cinza-escuro sobre
+// preto) — um bitmap não sofre essa recoloração automática. FLUXO_MAPA_NOS continua de pé só para
+// os 6 nós tipo "processo": viram botões INVISÍVEIS posicionados exatamente sobre as caixas da
+// imagem, preservando o clique numa caixa → fluxoAbrirSetor(nome) de sempre. Os nós tipo "saida" e
+// as linhas/rótulos de materiais (antes em FLUXO_MAPA_LIGACOES) já fazem parte da imagem e não
+// precisam mais de nenhuma estrutura de dados à parte.
 function montarFluxoMapa() {
   const canvas = document.getElementById('fluxoCanvas');
-  canvas.querySelectorAll('.fluxo-card, .fluxo-map-node, .fluxo-map-label').forEach(el => el.remove());
+  canvas.querySelectorAll('.fluxo-card, .fluxo-map-node, .fluxo-map-label, .fluxo-map-img').forEach(el => el.remove());
   canvas.style.width = FLUXO_MAPA_CANVAS.w + 'px';
   canvas.style.height = FLUXO_MAPA_CANVAS.h + 'px';
 
-  FLUXO_MAPA_NOS.forEach(no => {
-    const el = document.createElement(no.tipo === 'processo' ? 'button' : 'div');
-    el.className = 'fluxo-map-node ' + no.tipo + (no.tipo === 'processo' ? ' no-drag' : '');
+  const img = document.createElement('img');
+  img.className = 'fluxo-map-img no-drag';
+  img.src = 'img/fluxo-mapa-principal.png';
+  img.alt = 'Fluxo principal dos setores produtivos';
+  img.draggable = false;
+  canvas.appendChild(img);
+
+  FLUXO_MAPA_NOS.filter(no => no.tipo === 'processo').forEach(no => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'fluxo-map-node processo no-drag';
     el.style.left = no.x + 'px'; el.style.top = no.y + 'px'; el.style.width = no.w + 'px'; el.style.height = no.h + 'px';
-    if (no.tipo === 'processo') {
-      el.type = 'button';
-      el.dataset.setorNome = no.nome;
-      el.innerHTML = '<span class="fluxo-map-node-num">' + no.numero + '.</span><span class="fluxo-map-node-nome">' + esc(no.nome) + '</span>';
-    } else {
-      el.innerHTML = esc(no.nome).split('\n').join('<br>');
-    }
+    el.dataset.setorNome = no.nome;
+    el.setAttribute('aria-label', 'Abrir ' + no.nome);
     canvas.appendChild(el);
   });
 
-  FLUXO_MAPA_LIGACOES.forEach(lig => {
-    if (!lig.rotulo) return;
-    // Posição do rótulo: usa as coordenadas fixas (lx/ly) definidas à mão em cada ligação —
-    // testadas para não sobrepor nenhum outro rótulo nem nó do mapa. Sem lx/ly (não deveria
-    // ocorrer para uma ligação com rótulo, mas fica como resguardo), cai de volta no ponto médio
-    // da linha, que foi a causa dos rótulos sobrepostos antes desta correção.
-    let x, y;
-    if (lig.lx != null && lig.ly != null) {
-      x = lig.lx; y = lig.ly;
-    } else {
-      const pontos = fluxoMapaAncorasLig_(lig);
-      if (!pontos) return;
-      const meio = fluxoMid(pontos.p1, pontos.p2);
-      x = Math.min(meio.x, FLUXO_MAPA_CANVAS.w - 170); y = meio.y;
-    }
-    const lbl = document.createElement('div');
-    lbl.className = 'fluxo-map-label';
-    lbl.style.left = x + 'px';
-    lbl.style.top = y + 'px';
-    lbl.innerHTML = esc(lig.rotulo).split('\n').join('<br>');
-    canvas.appendChild(lbl);
-  });
-
-  fluxoMapaDesenharLinhas_();
-  requestAnimationFrame(() => requestAnimationFrame(fluxoAjustarTela));
-}
-
-function fluxoMapaDesenharLinhas_() {
+  // #fluxoConnectors (svg) é compartilhado com a tela 2 (fluxoDesenharConectores, cards por
+  // processo) — sem esta limpeza, uma linha desenhada lá poderia ficar "grudada" ao voltar para
+  // o mapa. Preserva só o <defs> (ponta de seta), mesma lógica já usada em fluxoDesenharConectores.
   const svg = document.getElementById('fluxoConnectors');
-  while (svg.children.length > 1) svg.removeChild(svg.lastChild); // preserva <defs> (ponta da seta)
-  FLUXO_MAPA_LIGACOES.forEach(lig => {
-    const pontos = fluxoMapaAncorasLig_(lig);
-    if (!pontos) return;
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('class', 'fluxo-conn-path');
-    path.setAttribute('marker-end', 'url(#fluxoArrowhead)');
-    path.setAttribute('d', fluxoMapaPath_(pontos.p1, pontos.p2));
-    svg.appendChild(path);
-  });
-  svg.setAttribute('width', FLUXO_MAPA_CANVAS.w);
-  svg.setAttribute('height', FLUXO_MAPA_CANVAS.h);
+  while (svg.children.length > 1) svg.removeChild(svg.lastChild);
+
+  requestAnimationFrame(() => requestAnimationFrame(fluxoAjustarTela));
 }
 
 function fluxoLayout(processos) {
@@ -1416,7 +1366,7 @@ function montarFluxoCanvas(processosBrutos, colaboradores, celulas, niveis, func
   FLUXO_STATIONS = processos;
 
   const canvas = document.getElementById('fluxoCanvas');
-  canvas.querySelectorAll('.fluxo-card, .fluxo-map-node, .fluxo-map-label').forEach(el => el.remove());
+  canvas.querySelectorAll('.fluxo-card, .fluxo-map-node, .fluxo-map-label, .fluxo-map-img').forEach(el => el.remove());
 
   processos.forEach((p, i) => {
     const aptos = colaboradores.filter(c => c.FUNCAO_ID === p.FUNCAO_ID);
