@@ -1,4 +1,4 @@
-  :root{
+:root{
     --azul:#1a73e8; --azul-escuro:#0b47a1; --verde:#0f9d58; --amarelo:#f4b400;
     --laranja:#f29900; --vermelho:#db4437; --cinza:#9aa0a6; --roxo:#673ab7;
     --bg:#f2f4f7; --bg-card:#ffffff; --borda:#e1e5ea; --texto:#1f2937; --texto-suave:#5f6b7a;
@@ -167,6 +167,15 @@
   }
   .campo textarea{resize:vertical; min-height:60px;}
 
+  /* ---------- Checklist de múltipla seleção (ex.: Função ao criar um Processo novo) ---------- */
+  .chk-lista{
+    display:flex; flex-direction:column; gap:2px; max-height:220px; overflow:auto;
+    border:1px solid var(--borda); border-radius:6px; padding:6px 4px;
+  }
+  .chk-item{display:flex; align-items:center; gap:8px; font-size:13px; padding:5px 6px; border-radius:5px; cursor:pointer;}
+  .chk-item:hover{background:#f3f5f8;}
+  .chk-item input{margin:0;}
+
   /* ---------- Seletor de nível visual (dentro do modal) ---------- */
   .seletor-niveis{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 4px;}
   .opcao-nivel{
@@ -241,26 +250,21 @@
   .fluxo-conn-path{fill:none; stroke:var(--texto); stroke-width:3; opacity:.55;}
   .fluxo-conn-arrow{fill:var(--texto); opacity:.55;}
 
-  /* Fluxo principal (mapa fixo dos setores produtivos, tela de entrada da aba) */
+  /* Fluxo principal (mapa fixo dos setores produtivos, tela de entrada da aba) — imagem estática
+     (img/fluxo-mapa-principal.png) travada no lugar do desenho ao vivo, com as 6 caixas numeradas
+     viradas em botões transparentes sobrepostos, mantendo o clique de sempre. */
+  .fluxo-map-img{
+    position:absolute; top:0; left:0; width:100%; height:100%; display:block; pointer-events:none;
+  }
   .fluxo-map-node{
-    position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:2px; border-radius:10px; text-align:center; padding:6px 10px; box-sizing:border-box;
+    position:absolute; border-radius:10px; box-sizing:border-box;
   }
   .fluxo-map-node.processo{
-    background:var(--texto); color:#fff; border:none; cursor:pointer; box-shadow:var(--shadow);
-    font-family:inherit;
+    background:rgba(30,42,58,0); border:none; cursor:pointer; padding:0;
+    transition:background .12s ease;
   }
-  .fluxo-map-node.processo:hover{background:var(--marinho);}
-  .fluxo-map-node.processo:focus-visible{outline:2px solid var(--azul); outline-offset:2px;}
-  .fluxo-map-node-num{font-size:10.5px; font-weight:700; opacity:.75;}
-  .fluxo-map-node-nome{font-size:13px; font-weight:800; line-height:1.25;}
-  .fluxo-map-node.saida{
-    background:#dfe3e8; color:var(--texto); border:1px solid var(--borda); font-size:11px; font-weight:700; line-height:1.35;
-  }
-  .fluxo-map-label{
-    position:absolute; font-size:10px; line-height:1.5; color:var(--texto-suave); white-space:nowrap;
-    pointer-events:none; max-width:220px; white-space:normal;
-  }
+  .fluxo-map-node.processo:hover{background:rgba(255,255,255,.16);}
+  .fluxo-map-node.processo:focus-visible{outline:2px solid var(--azul); outline-offset:2px; background:rgba(255,255,255,.16);}
 
   .fluxo-card{
     position:absolute; width:300px; background:#fff; border:1px solid var(--borda);
