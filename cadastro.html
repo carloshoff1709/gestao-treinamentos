@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cadastro — Produção Visia</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1A2540">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Visia">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#EEF1F5;color:#1A2540;padding:0;}
+.top{background:#1A2540;color:#fff;padding:14px 22px;display:flex;align-items:center;justify-content:space-between;}
+.top h1{font-size:17px;font-weight:700;}
+.top .st{font-size:11px;opacity:.7;}
+.tabs{display:flex;gap:6px;padding:14px 22px 0;}
+.tab{padding:9px 18px;background:#DCE1E8;border:none;border-radius:8px 8px 0 0;font-size:13px;font-weight:600;cursor:pointer;color:#5A6472;}
+.tab.on{background:#fff;color:#185FA5;}
+.wrap{background:#fff;margin:0 22px 22px;border-radius:0 10px 10px 10px;padding:20px;min-height:70vh;}
+.card{background:#F7F9FB;border:1px solid #E1E6EC;border-radius:10px;padding:16px;margin-bottom:18px;}
+.card h2{font-size:13px;color:#374151;margin-bottom:12px;letter-spacing:.03em;}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
+.fld{flex:1;min-width:140px;}
+.fld label{display:block;font-size:11px;color:#6B7280;margin-bottom:4px;}
+.fld input,.fld select{width:100%;padding:8px 10px;border:1px solid #D8DCE3;border-radius:7px;font-size:13px;}
+.fld input:focus,.fld select:focus{outline:none;border-color:#185FA5;}
+.btn{padding:9px 18px;background:#1D9E75;border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+.btn:hover{filter:brightness(1.05);}
+.btn.sec{background:#EEF0F4;color:#374151;}
+.btn.del{background:#E24B4A;}
+.btn.sm{padding:5px 10px;font-size:11px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;padding:8px;background:#F0F3F7;color:#5A6472;font-weight:600;border-bottom:2px solid #E1E6EC;position:sticky;top:0;}
+td{padding:8px;border-bottom:1px solid #EEF1F5;}
+tr:hover td{background:#F7F9FB;}
+.tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;}
+.tag.ok{background:#DCFCE7;color:#166534;}
+.tag.no{background:#FEE2E2;color:#991B1B;}
+.msg{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;display:none;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.2);}
+.msg.ok{background:#1D9E75;} .msg.err{background:#E24B4A;} .msg.load{background:#185FA5;}
+.hint{font-size:11px;color:#9CA3AF;margin-top:3px;}
+.acts{display:flex;gap:6px;}
+.hidden{display:none;}
+.empty{text-align:center;color:#9CA3AF;padding:30px;font-size:13px;}
+
+/* --- Login + Navegação --- */
+#login-overlay{position:fixed;inset:0;background:linear-gradient(160deg,#0F1626,#1A2540);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
+#login-box{background:#fff;border-radius:16px;padding:30px;max-width:340px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);}
+#login-box h2{font-size:18px;color:#1A2540;margin-bottom:4px;text-align:center;}
+#login-box p{font-size:12px;color:#6B7280;text-align:center;margin-bottom:20px;}
+#login-box label{font-size:11px;color:#6B7280;display:block;margin-bottom:4px;}
+#login-box input{width:100%;padding:10px;border:1px solid #D8DCE3;border-radius:8px;font-size:14px;margin-bottom:14px;}
+#login-box input:focus{outline:none;border-color:#185FA5;}
+#login-box button{width:100%;padding:11px;background:#185FA5;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;}
+#login-erro{color:#E24B4A;font-size:12px;text-align:center;margin-top:10px;min-height:16px;}
+.nav-voltar{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;text-decoration:none;margin-right:12px;}
+.nav-voltar:hover{background:rgba(255,255,255,.2);}
+.nav-user{font-size:11px;color:rgba(255,255,255,.7);margin-left:8px;}
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+<datalist id="codigos-padrao">
+  <option value="EST-PISO-P">Estrutura Piso Padrão</option>
+  <option value="PISO-CAD-P">Piso CAD Padrão</option>
+  <option value="EST-PISO-E">Estrutura Piso Específico</option>
+  <option value="PISO-CAD-E">Piso CAD Específico</option>
+  <option value="EST-TETO-E">Estrutura Teto Específico</option>
+  <option value="TETO-GRC-E">Teto GRC Específico</option>
+  <option value="EST-TETO-P">Estrutura Teto Padrão</option>
+  <option value="TETO-GRC-P">Teto GRC Padrão</option>
+</datalist>
+
+<div id="login-overlay">
+  <div id="login-box">
+    <h2>🔒 Acesso restrito</h2>
+    <p>Entre com seu usuário para continuar</p>
+    <label>Usuário</label>
+    <input id="login-user" autocomplete="username" onkeydown="if(event.key==='Enter')fazerLogin()">
+    <label>Senha</label>
+    <input id="login-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')fazerLogin()">
+    <button onclick="fazerLogin()">Entrar</button>
+    <div id="login-erro"></div>
+  </div>
+</div>
+
+<div class="top">
+  <div style="display:flex;align-items:center;"><img src="data:image/png;base64,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" style="height:26px;width:auto;vertical-align:middle;margin-right:12px;" alt="Visia"><h1 style="display:inline;">Cadastro</h1></div>
+  <div style="display:flex;align-items:center;gap:8px;"><a class="nav-voltar" href="index.html">← Menu</a><span id="nav-user-label" class="nav-user"></span><a class="nav-voltar" href="#" onclick="sair();return false;">Sair</a><span class="st" id="status" style="margin-left:8px;">Carregando…</span></div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" id="tab-prod" onclick="trocarAba('prod')">Produtos</button>
+  <button class="tab" id="tab-peca" onclick="trocarAba('peca')">Peças</button>
+  <button class="tab" id="tab-imp" onclick="trocarAba('imp')">📥 Importar</button>
+</div>
+
+<!-- ══════════ PRODUTOS ══════════ -->
+<div class="wrap" id="pane-prod">
+  <div class="card">
+    <h2 id="form-prod-titulo">➕ NOVO PRODUTO</h2>
+    <div class="row">
+      <div class="fld"><label>ID do produto *</label><input id="p-id" placeholder="Ex: PR07 ou RR-2-01"></div>
+      <div class="fld"><label>Nome do produto</label><input id="p-nome" placeholder="Ex: Monobloco"></div>
+      <div class="fld"><label>Data programada</label><input type="date" id="p-data"></div>
+    </div>
+    <div class="row">
+      <div class="fld" style="flex:1 1 100%;">
+        <label style="font-weight:700;color:#374151;">Peças necessárias — cadastre uma a uma</label>
+        <div style="background:#EEF3F8;border:1px solid #D3E0EC;border-radius:10px;padding:12px;margin-top:6px;">
+          <div class="row" style="margin-bottom:8px;">
+            <div class="fld"><label>ID da peça *</label><input id="np-id" list="codigos-padrao" placeholder="Ex: EST-PISO-P ou E-A11-CI03"></div>
+            <div class="fld"><label>Nome da peça</label><input id="np-nome" placeholder="Ex: Estrutura Piso Padrão"></div>
+            <div class="fld"><label>Serial (código de barras)</label><input id="np-serial" placeholder="Ex: 789012345"></div>
+            <div class="fld"><label>Setor que fabrica</label>
+              <select id="np-setorfab"><option value="">—</option></select></div>
+            <div class="fld"><label>Data prev. fabricação</label><input id="np-datafab" type="date"></div>
+            <div class="fld" id="fld-np-vira" style="display:none;"><label>Vira → ID da peça</label><input id="np-vira" placeholder="Ex: Piso CAD"></div>
+            <div class="fld" id="fld-np-viranome" style="display:none;"><label>Vira → Nome</label><input id="np-viranome" placeholder="Ex: Piso CAD 6x3m"></div>
+            <div class="fld" id="fld-np-viraserial" style="display:none;"><label>Vira → Serial</label><input id="np-viraserial" placeholder="Ex: 789012345"></div>
+            <div class="fld" id="fld-np-viradata" style="display:none;"><label>Vira → Data fab.</label><input id="np-viradata" type="date"></div>
+          </div>
+          <button type="button" class="btn" onclick="adicionarPecaCascata()" style="background:#185FA5;">+ Adicionar peça</button>
+          <div class="hint" style="margin-top:6px;">Cada peça adicionada é cadastrada na aba Peças ao salvar o produto. Repita o ID para exigir mais de uma unidade.</div>
+        </div>
+        <div id="pecas-cascata" style="margin-top:10px;"></div>
+      </div>
+    </div>
+    <div class="acts">
+      <button class="btn" onclick="salvarProduto()">Salvar produto</button>
+      <button class="btn sec hidden" id="p-cancel" onclick="limparFormProduto()">Cancelar edição</button>
+    </div>
+  </div>
+  <h2 style="font-size:13px;color:#374151;margin-bottom:10px;">PRODUTOS CADASTRADOS</h2>
+  <div style="max-height:50vh;overflow-y:auto;">
+    <table id="tbl-prod"><thead><tr><th>ID</th><th>Nome</th><th>Peças</th><th>Data prog.</th><th>Status</th><th>Ações</th></tr></thead><tbody></tbody></table>
+    <div class="empty hidden" id="empty-prod">Nenhum produto cadastrado ainda.</div>
+  </div>
+</div>
+
+<!-- ══════════ PEÇAS ══════════ -->
+<div class="wrap hidden" id="pane-peca">
+  <div class="card">
+    <h2 id="form-peca-titulo">➕ NOVA PEÇA</h2>
+    <div class="row">
+      <div class="fld"><label>ID da peça *</label><input id="pc-id" list="codigos-padrao" placeholder="Ex: EST-PISO-P ou E-A11-CI03"></div>
+      <div class="fld"><label>Nome da peça</label><input id="pc-nome" placeholder="Ex: Estrutura Piso Padrão"></div>
+      <div class="fld"><label>Serial (código de barras)</label><input id="pc-serial" placeholder="Ex: 789012345"></div>
+      <div class="fld"><label>Setor que fabrica</label>
+        <select id="pc-setorfab"><option value="">—</option></select>
+      </div>
+      <div class="fld"><label>Data prev. fabricação</label><input id="pc-datafab" type="date"></div>
+      <div class="fld" id="fld-pc-vira" style="display:none;"><label>Vira → ID da peça</label><input id="pc-vira" placeholder="Ex: Piso CAD"></div>
+      <div class="fld" id="fld-pc-viranome" style="display:none;"><label>Vira → Nome da peça</label><input id="pc-viranome" placeholder="Ex: Piso CAD 6x3m"></div>
+      <div class="fld" id="fld-pc-viraserial" style="display:none;"><label>Vira → Serial</label><input id="pc-viraserial" placeholder="Ex: 789012345"></div>
+      <div class="fld" id="fld-pc-viradata" style="display:none;"><label>Vira → Data fabricação</label><input id="pc-viradata" type="date"></div>
+      <div class="fld"><label>Status</label>
+        <select id="pc-status"><option value="Faltando">Faltando</option><option value="Disponivel">Disponivel</option></select>
+      </div>
+    </div>
+    <div class="acts">
+      <button class="btn" onclick="salvarPeca()">Salvar peça</button>
+      <button class="btn sec hidden" id="pc-cancel" onclick="limparFormPeca()">Cancelar edição</button>
+    </div>
+    <div class="hint" style="margin-top:8px;">Para cadastrar várias unidades da mesma peça física, crie IDs iguais em linhas diferentes (ex: duas peças GRC-A057) — use IDs iguais só se controlar por quantidade.</div>
+  </div>
+  <h2 style="font-size:13px;color:#374151;margin-bottom:10px;">PEÇAS CADASTRADAS</h2>
+  <div style="max-height:50vh;overflow-y:auto;">
+    <table id="tbl-peca"><thead><tr><th>ID</th><th>Nome</th><th>Serial</th><th>Status</th><th>Atualizado</th><th>Por</th><th>Ações</th></tr></thead><tbody></tbody></table>
+    <div class="empty hidden" id="empty-peca">Nenhuma peça cadastrada ainda.</div>
+  </div>
+</div>
+
+<div class="wrap hidden" id="pane-imp">
+  <div style="background:#F8FAFC;border:1px solid #E1E6EC;border-radius:12px;padding:22px;margin-bottom:18px;">
+    <h2 style="font-size:15px;color:#12233A;margin-bottom:6px;">📥 Importar produtos e peças em massa</h2>
+    <p style="font-size:13px;color:#6B7280;margin-bottom:16px;">Baixe o modelo, preencha (uma linha por peça, repetindo o produto), e suba o arquivo. O sistema cadastra tudo de uma vez.</p>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+      <a href="Modelo_Importacao_Visia.xlsx" download class="btn" style="background:#1D9E75;text-decoration:none;display:inline-flex;align-items:center;">⬇ Baixar modelo Excel</a>
+    </div>
+    <p style="font-size:11px;color:#9CA3AF;margin:-10px 0 16px;">Ao importar, o sistema avisa se algum setor não estiver cadastrado na configuração.</p>
+
+    <div style="border:2px dashed #C4CDD8;border-radius:10px;padding:24px;text-align:center;background:#fff;">
+      <input type="file" id="imp-file" accept=".csv,.xlsx,.xls" onchange="lerArquivoImport()" style="display:none;">
+      <button class="btn" onclick="document.getElementById('imp-file').click()" style="background:#185FA5;">Escolher arquivo (CSV ou Excel)</button>
+      <div id="imp-nome" style="font-size:12px;color:#6B7280;margin-top:10px;">Nenhum arquivo selecionado.</div>
+    </div>
+  </div>
+
+  <div id="imp-preview" class="hidden" style="background:#fff;border:1px solid #E1E6EC;border-radius:12px;padding:20px;">
+    <h3 style="font-size:14px;color:#12233A;margin-bottom:10px;">Prévia da importação</h3>
+    <div id="imp-resumo" style="font-size:13px;color:#374151;margin-bottom:14px;"></div>
+    <div style="max-height:40vh;overflow:auto;border:1px solid #E7EBF0;border-radius:8px;margin-bottom:16px;">
+      <table id="imp-tbl" style="font-size:11px;"><thead></thead><tbody></tbody></table>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn" onclick="confirmarImport('adicionar')" style="background:#1D9E75;">➕ Adicionar aos existentes</button>
+      <button class="btn del" onclick="confirmarImport('substituir')">🔄 Substituir tudo</button>
+      <button class="btn sec" onclick="cancelarImport()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="msg" id="msg"></div>
+
+<script>
+const URL='https://script.google.com/macros/s/AKfycbyRmbuI33AEe4LJObYZZ4WPujjc3fyzAzHHMd1kli1pUQaar-Y99xulhfRgixecuoW0/exec';
+
+// Códigos padrão: ID -> nome (ao escolher o ID, o nome preenche e trava automaticamente)
+// quando o ID digitado é um código padrão, preenche e trava o nome; senão libera
+
+/* ── Comunicação com Apps Script (JSONP + fallback) ── */
+let _cb=0;
+function jsonp(params){
+  return new Promise((res,rej)=>{
+    const cb='__cb'+(_cb++);
+    const s=document.createElement('script');
+    const to=setTimeout(()=>{cleanup();rej(new Error('timeout'));},15000);
+    function cleanup(){clearTimeout(to);delete window[cb];s.remove();}
+    window[cb]=d=>{cleanup();res(d);};
+    s.onerror=()=>{cleanup();rej(new Error('erro script'));};
+    s.src=URL+(URL.includes('?')?'&':'?')+params+'&callback='+cb+'&t='+Date.now();
+    document.body.appendChild(s);
+  });
+}
+async function api(params){
+  // JSONP primeiro (contorna CORS do Apps Script); fetch como fallback
+  try{ return await jsonp(params); }catch(_){}
+  const full=URL+(URL.includes('?')?'&':'?')+params+'&t='+Date.now();
+  try{ const r=await fetch(full,{cache:'no-store'}); if(r.ok){ return JSON.parse(await r.text()); } }catch(_){}
+  const proxies=[u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`];
+  for(const px of proxies){ try{ const r=await fetch(px(full),{cache:'no-store'}); if(r.ok){ return JSON.parse(await r.text()); } }catch(_){} }
+  return null;
+}
+
+/* --- LOGIN + SESSÃO --- */
+let USUARIO_LOGADO = sessionStorage.getItem('visia_user') || '';
+function checarLogin(){
+  if(USUARIO_LOGADO){ document.getElementById('login-overlay').style.display='none'; mostrarUsuario(); }
+  else { document.getElementById('login-overlay').style.display='flex'; }
+}
+async function fazerLogin(){
+  const u=document.getElementById('login-user').value.trim();
+  const p=document.getElementById('login-pass').value.trim();
+  const erro=document.getElementById('login-erro');
+  if(!u||!p){ erro.textContent='Preencha usuário e senha.'; return; }
+  erro.textContent='Verificando...';
+  const r=await api('action=login&usuario='+encodeURIComponent(u)+'&senha='+encodeURIComponent(p));
+  if(r&&r.ok){
+    USUARIO_LOGADO=r.usuario;
+    sessionStorage.setItem('visia_user',r.usuario);
+    sessionStorage.setItem('visia_nome',r.nome||r.usuario);
+    document.getElementById('login-overlay').style.display='none';
+    erro.textContent='';
+    mostrarUsuario();
+    if(typeof aoLogar==='function') aoLogar();
+  } else {
+    erro.textContent=(r&&r.erro)||'Falha no login.';
+  }
+}
+function mostrarUsuario(){
+  const el=document.getElementById('nav-user-label');
+  if(el) el.textContent='👤 '+(sessionStorage.getItem('visia_nome')||USUARIO_LOGADO);
+}
+function sair(){ sessionStorage.removeItem('visia_user'); sessionStorage.removeItem('visia_nome'); location.reload(); }
+
+
+function msg(t,txt){const m=document.getElementById('msg');m.className='msg '+t;m.textContent=txt;m.style.display='block';if(t!=='load')setTimeout(()=>m.style.display='none',3000);}
+function setStatus(t){document.getElementById('status').textContent=t;}
+
+/* ── Abas ── */
+function trocarAba(qual){
+  document.getElementById('tab-prod').classList.toggle('on',qual==='prod');
+  document.getElementById('tab-peca').classList.toggle('on',qual==='peca');
+  document.getElementById('tab-imp').classList.toggle('on',qual==='imp');
+  document.getElementById('pane-prod').classList.toggle('hidden',qual!=='prod');
+  document.getElementById('pane-peca').classList.toggle('hidden',qual!=='peca');
+  document.getElementById('pane-imp').classList.toggle('hidden',qual!=='imp');
+  if(qual==='prod') carregarProdutos();
+  else if(qual==='peca') carregarPecas();
+}
+
+/* ══════════ IMPORTAÇÃO ══════════ */
+let IMPORT_DADOS=null;
+function lerArquivoImport(){
+  const inp=document.getElementById('imp-file');
+  const file=inp.files[0];
+  if(!file) return;
+  document.getElementById('imp-nome').textContent='Lendo: '+file.name;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const data=new Uint8Array(ev.target.result);
+      // cellDates:true converte datas para Date; a leitura considera UTC para
+      // não deslocar o dia pelo fuso de São Paulo.
+      const wb=XLSX.read(data,{type:'array',cellDates:true,cellNF:false,cellText:false});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const linhas=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
+      processarLinhasImport(linhas);
+    }catch(err){ msg('err','Erro ao ler arquivo: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function normalizarData(v){
+  if(!v) return '';
+  const p2=n=>{ n=String(n); return n.length<2?'0'+n:n; };
+  // objeto Date real (vindo do Excel com cellDates). Usa métodos UTC para não
+  // deslocar o dia por causa do fuso horário (São Paulo é UTC-3): o SheetJS
+  // grava a data em UTC meia-noite, então lemos em UTC para preservar o dia.
+  if(v instanceof Date && !isNaN(v.getTime())){
+    return p2(v.getUTCDate())+'/'+p2(v.getUTCMonth()+1)+'/'+v.getUTCFullYear();
+  }
+  v=String(v).trim();
+  if(!v) return '';
+  // texto que é um número serial de data do Excel (ex: "46233" = 30/07/2026)
+  if(/^\d{5}$/.test(v)){
+    const n=parseInt(v,10);
+    if(n>=20000 && n<=60000){
+      const d=new Date(Date.UTC(1899,11,30)+n*86400000);
+      return p2(d.getUTCDate())+'/'+p2(d.getUTCMonth()+1)+'/'+d.getUTCFullYear();
+    }
+  }
+  // ISO yyyy-mm-dd
+  let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return p2(m[3])+'/'+p2(m[2])+'/'+m[1];
+  // dd/mm/aaaa ou mm/dd/aa (detecta pelo valor)
+  m=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(m){
+    let d=parseInt(m[1],10), mo=parseInt(m[2],10), y=parseInt(m[3],10);
+    if(mo>12&&d<=12){ const t=d; d=mo; mo=t; } // formato americano -> troca
+    if(y<100) y+=2000;
+    return p2(d)+'/'+p2(mo)+'/'+y;
+  }
+  return v;
+}
+
+function processarLinhasImport(linhas){
+  if(!linhas.length){ msg('err','Arquivo vazio ou sem dados.'); return; }
+  // monta o sufixo único do produto (ex: "CI-2-08 - P1" -> "CI-2-08-P1")
+  const sufixoProd=idp=>String(idp||'').replace(/\s*-\s*/g,'-').replace(/\s+/g,'').toUpperCase();
+  // anexa o produto ao id da peça, se ainda não estiver anexado
+  const idUnico=(base,idp)=>{
+    base=String(base||'').trim();
+    if(!base) return base;
+    const suf='-'+sufixoProd(idp);
+    // se já termina com o sufixo do produto, não duplica
+    if(base.toUpperCase().endsWith(suf.toUpperCase())) return base;
+    return base+suf;
+  };
+  // helper para ler uma coluna de uma linha (aceita variações de nome)
+  const campo=(l,nomes)=>{ for(const n of nomes){ for(const k in l){ if(k.toLowerCase().trim()===n) return String(l[k]).trim(); } } return ''; };
+  const ehSim=v=>{ const t=String(v||'').trim().toLowerCase(); return t==='sim'||t==='s'||t==='x'||t==='true'||t==='1'; };
+  const normSetor=v=>{ const t=(v||'').trim(); return t.toLowerCase()==='célula de estruturas'?'Célula de Estruturas':t.toUpperCase(); };
+
+  // primeiro, extrai os dados básicos de cada linha (preservando a ORDEM)
+  const linhasDados=linhas.map(l=>{
+    const idProd=campo(l,['id_produto','idproduto']);
+    const idPeca=campo(l,['id_peca','idpeca']);
+    if(!idProd||!idPeca) return null;
+    return {
+      idProd,
+      nome_produto:campo(l,['nome_produto','nomeproduto']),
+      data_programada:normalizarData(campo(l,['data_programada','dataprogramada'])),
+      data_saida:normalizarData(campo(l,['data_saida','datasaida','data saida','saida'])),
+      id_peca_base:idPeca,
+      // nome: usa o da planilha; se vazio e o id for código padrão, preenche pelo mapa
+      // código padrão -> nome padrão TRAVADO (ignora o digitado); outros códigos -> usa o nome digitado
+      nome_peca:(nomePorId(idPeca) || campo(l,['nome_peca','nomepeca'])),
+      serial:campo(l,['serial','codigo_barras','serial (codigo de barras)']),
+      setor_fabrica:normSetor(campo(l,['setor_fabrica','setorfabrica','setor que fabrica'])),
+      data_fabricacao:normalizarData(campo(l,['data_fabricacao','datafabricacao','data prev. fabricacao'])),
+      // novo padrão: coluna "vira?" (SIM/NAO)
+      vira_flag:campo(l,['vira_peca?','vira?','vira peca?','vira a peça?','vira a peca?','vira']),
+      // compatibilidade com o formato antigo (colunas vira_* preenchidas direto)
+      vira_peca_old:campo(l,['vira_peca','virapeca']),
+      vira_nome_old:campo(l,['vira_nome','viranome']),
+      vira_serial_old:campo(l,['vira_serial','viraserial']),
+      vira_data_old:normalizarData(campo(l,['vira_data','viradata']))
+    };
+  });
+
+  const mapa={};
+  const ordem=[];
+  for(let i=0;i<linhasDados.length;i++){
+    const d=linhasDados[i];
+    if(!d) continue;
+    if(!mapa[d.idProd]){
+      mapa[d.idProd]={ id_produto:d.idProd, nome_produto:d.nome_produto, data_programada:d.data_programada, data_saida:d.data_saida, pecas:[] };
+      ordem.push(d.idProd);
+    }
+    // define o vínculo vira_*
+    let vira_peca='', vira_nome='', vira_serial='', vira_data='';
+    if(d.vira_flag){
+      // NOVO padrão: "vira?" preenchido. Se SIM, pega a peça da LINHA DE BAIXO como o que ela vira.
+      if(ehSim(d.vira_flag)){
+        const prox=linhasDados[i+1];
+        if(prox && prox.idProd===d.idProd){
+          vira_peca=idUnico(prox.id_peca_base, d.idProd);
+          vira_nome=prox.nome_peca;
+          vira_serial=prox.serial;
+          vira_data=prox.data_fabricacao;
+        }
+      }
+      // se "não", fica tudo vazio (estrutura individual, vai pra montagem)
+    } else if(d.vira_peca_old){
+      // formato ANTIGO: colunas vira_* preenchidas direto
+      vira_peca=idUnico(d.vira_peca_old, d.idProd);
+      vira_nome=d.vira_nome_old; vira_serial=d.vira_serial_old; vira_data=d.vira_data_old;
+    }
+    mapa[d.idProd].pecas.push({
+      id_peca:idUnico(d.id_peca_base, d.idProd),
+      nome_peca:d.nome_peca, serial:d.serial, setor_fabrica:d.setor_fabrica,
+      data_fabricacao:d.data_fabricacao,
+      vira_peca, vira_nome, vira_serial, vira_data
+    });
+  }
+  IMPORT_DADOS=ordem.map(id=>mapa[id]);
+  mostrarPreviewImport();
+}
+
+function mostrarPreviewImport(){
+  if(!IMPORT_DADOS||!IMPORT_DADOS.length){ msg('err','Nenhum produto válido encontrado.'); return; }
+  const totalPecas=IMPORT_DADOS.reduce((s,p)=>s+p.pecas.length,0);
+  document.getElementById('imp-nome').textContent=document.getElementById('imp-file').files[0].name+' — lido com sucesso';
+  // valida os setores: avisa se algum não estiver cadastrado na configuração
+  const validosUp=SETORES_VALIDOS.map(s=>s.trim().toUpperCase());
+  const setoresInvalidos=new Set();
+  IMPORT_DADOS.forEach(p=>p.pecas.forEach(pc=>{
+    const s=(pc.setor_fabrica||'').trim();
+    if(s && !validosUp.includes(s.toUpperCase())) setoresInvalidos.add(s);
+  }));
+  let avisoSetor='';
+  if(setoresInvalidos.size){
+    avisoSetor=`<div style="background:#FDEBEC;color:#C0392B;border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;">
+      ⚠️ Setor(es) não cadastrado(s) na configuração: <strong>${[...setoresInvalidos].join(', ')}</strong>.<br>
+      Cadastre em "Setores e Fluxos" antes de importar, ou corrija a planilha. Você pode importar assim mesmo, mas esses setores não terão filtro/fluxo configurado.
+    </div>`;
+  }
+  document.getElementById('imp-resumo').innerHTML=`<strong>${IMPORT_DADOS.length}</strong> produto(s) e <strong>${totalPecas}</strong> peça(s) encontrados.`+avisoSetor;
+  // tabela de prévia
+  const thead=document.querySelector('#imp-tbl thead');
+  const tbody=document.querySelector('#imp-tbl tbody');
+  thead.innerHTML='<tr><th>Produto</th><th>Data prog.</th><th>Peça</th><th>Serial</th><th>Setor</th><th>Data fab.</th></tr>';
+  let html='';
+  IMPORT_DADOS.forEach(p=>{
+    p.pecas.forEach((pc,i)=>{
+      html+=`<tr>
+        <td>${i===0?('<strong>'+p.id_produto+'</strong><br><span style="color:#9CA3AF;">'+(p.nome_produto||'')+'</span>'):''}</td>
+        <td>${i===0?(p.data_programada||'-'):''}</td>
+        <td>${pc.id_peca}</td><td>${pc.serial||'-'}</td><td>${pc.setor_fabrica||'-'}</td><td>${pc.data_fabricacao||'-'}</td>
+      </tr>`;
+    });
+  });
+  tbody.innerHTML=html;
+  document.getElementById('imp-preview').classList.remove('hidden');
+}
+
+async function confirmarImport(modo){
+  if(!IMPORT_DADOS||!IMPORT_DADOS.length) return;
+  const totalPecas=IMPORT_DADOS.reduce((s,p)=>s+p.pecas.length,0);
+  const txt=modo==='substituir'
+    ? `SUBSTITUIR TUDO?\n\nIsto vai APAGAR todos os produtos e peças atuais e cadastrar ${IMPORT_DADOS.length} produto(s) e ${totalPecas} peça(s).\n\nEsta ação não pode ser desfeita.`
+    : `Adicionar ${IMPORT_DADOS.length} produto(s) e ${totalPecas} peça(s) aos existentes?`;
+  if(!confirm(txt)) return;
+  msg('load','Importando… isso pode levar alguns segundos.');
+  // envia via POST para não estourar o limite de tamanho da URL.
+  // text/plain evita o "preflight" CORS que o Apps Script não responde.
+  let r=null;
+  try{
+    const body='action=importar&modo='+encodeURIComponent(modo)+'&dados='+encodeURIComponent(JSON.stringify(IMPORT_DADOS));
+    const resp=await fetch(URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:body
+    });
+    if(resp.ok) r=JSON.parse(await resp.text());
+  }catch(err){ /* tenta fallback abaixo */ }
+  // fallback: se o POST falhar (raro), tenta o método normal
+  if(!r){
+    r=await api('action=importar&modo='+encodeURIComponent(modo)+'&dados='+encodeURIComponent(JSON.stringify(IMPORT_DADOS)));
+  }
+  if(r&&r.ok){
+    msg('ok','Importado: '+r.produtos+' produto(s) e '+r.pecas+' peça(s)!');
+    cancelarImport();
+    trocarAba('prod');
+  }else{ msg('err','Falha na importação: '+((r&&r.erro)||'sem resposta do servidor')); }
+}
+
+function cancelarImport(){
+  IMPORT_DADOS=null;
+  document.getElementById('imp-file').value='';
+  document.getElementById('imp-nome').textContent='Nenhum arquivo selecionado.';
+  document.getElementById('imp-preview').classList.add('hidden');
+}
+
+
+/* ══════════ PRODUTOS ══════════ */
+function isoParaBR(iso){ if(!iso) return ''; const [a,m,d]=iso.split('-'); return `${d}/${m}/${a}`; }
+function brParaIso(br){ if(!br||br.indexOf('/')<0) return ''; const [d,m,a]=br.split('/'); return `${a}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; }
+
+async function carregarProdutos(){
+  setStatus('Carregando produtos…');
+  await carregarMapaPecas();
+  const lista=await api('action=produtos');
+  const tb=document.querySelector('#tbl-prod tbody');
+  const vazio=document.getElementById('empty-prod');
+  if(!Array.isArray(lista)){ setStatus('Erro ao carregar'); return; }
+  if(lista.length===0){ tb.innerHTML=''; vazio.classList.remove('hidden'); setStatus('0 produtos'); return; }
+  vazio.classList.add('hidden');
+  tb.innerHTML=lista.map(p=>{
+    const verde=p.status==='Verde';
+    const pecas=(p.pecas||[]).join(', ');
+    const nome=(p.nome_produto||'').replace(/"/g,'&quot;');
+    return `<tr>
+      <td><strong>${p.id_produto}</strong></td>
+      <td>${p.nome_produto||''}</td>
+      <td style="max-width:220px;font-size:11px;color:#6B7280;">${pecas}</td>
+      <td>${p.data_programada||'—'}</td>
+      <td><span class="tag ${verde?'ok':'no'}">${verde?'🟢 Verde':'🔴 Vermelho'}</span></td>
+      <td><div class="acts">
+        <button class="btn sec sm" onclick="editarProduto('${p.id_produto}','${nome}','${(p.pecas||[]).join(',')}','${p.data_programada||''}')">Editar</button>
+        <button class="btn del sm" onclick="excluirProduto('${p.id_produto}',${(p.pecas||[]).length})">Excluir</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  setStatus(lista.length+' produto(s)');
+}
+
+/* Lista de peças em cascata para o produto atual */
+let pecasCascata=[]; // [{id,nome,serial}]
+
+function adicionarPecaCascata(){
+  const id=document.getElementById('np-id').value.trim();
+  if(!id){ msg('err','Informe o ID da peça.'); return; }
+  let nome=document.getElementById('np-nome').value.trim();
+  let serial=document.getElementById('np-serial').value.trim();
+  let setorfab=document.getElementById('np-setorfab').value;
+  let datafab=isoParaBR(document.getElementById('np-datafab').value);
+  // campos vira peça (só preenchidos quando setor = Célula de Estruturas)
+  let vira=document.getElementById('np-vira').value.trim();
+  let viranome=document.getElementById('np-viranome').value.trim();
+  let viraserial=document.getElementById('np-viraserial').value.trim();
+  let viradata=isoParaBR(document.getElementById('np-viradata').value);
+  // se não digitou nome/serial mas o ID já existe, herda os dados cadastrados
+  const info=MAPA_PECAS[id];
+  if(info){
+    if(!nome) nome=info.nome||'';
+    if(!serial) serial=info.serial||'';
+  }
+  pecasCascata.push({id,nome,serial,setor_fabrica:setorfab,data_fabricacao:datafab,vira_peca:vira,vira_nome:viranome,vira_serial:viraserial,vira_data:viradata});
+  ['np-id','np-nome','np-serial','np-datafab','np-vira','np-viranome','np-viraserial','np-viradata'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('np-setorfab').value='';
+  toggleViraPeca();
+  document.getElementById('np-id').focus();
+  renderCascata();
+  autoNome('np-id','np-nome'); // reaplica trava do nome
+}
+function removerPecaCascata(i){ pecasCascata.splice(i,1); renderCascata(); }
+function renderCascata(){
+  const c=document.getElementById('pecas-cascata');
+  if(pecasCascata.length===0){ c.innerHTML='<div class="hint">Nenhuma peça adicionada ainda.</div>'; return; }
+  c.innerHTML=pecasCascata.map((p,i)=>{
+    const nome = p.nome || '';
+    const serial = p.serial || '';
+    const setor = p.setor_fabrica ? (' · '+p.setor_fabrica) : '';
+    const dfab = p.data_fabricacao ? (' · fab '+p.data_fabricacao) : '';
+    const vira = p.vira_peca ? (' · ↳ vira '+p.vira_peca) : '';
+    const detalhe = [nome||'sem nome', serial?('serial '+serial):'sem serial'].join(' · ')+setor+dfab+vira;
+    return `
+    <div style="display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #E1E6EC;border-radius:8px;padding:8px 12px;margin-bottom:6px;">
+      <span style="font-size:13px;font-weight:700;">${p.id}</span>
+      <span style="font-size:12px;color:#6B7280;flex:1;">${detalhe}</span>
+      <button class="btn del sm" onclick="removerPecaCascata(${i})">Remover</button>
+    </div>`;
+  }).join('');
+}
+
+async function salvarProduto(){
+  const id=document.getElementById('p-id').value.trim();
+  if(!id){ msg('err','Informe o ID do produto.'); return; }
+  if(pecasCascata.length===0){ msg('err','Adicione ao menos uma peça ao produto.'); return; }
+  const nome=document.getElementById('p-nome').value.trim();
+  const data=isoParaBR(document.getElementById('p-data').value);
+
+  msg('load','Salvando produto…');
+  // monta mapa {id: {nome, serial}} das peças da cascata
+  const infoPecas={};
+  pecasCascata.forEach(pc=>{ infoPecas[pc.id]={nome:(pc.nome||'').trim(), serial:(pc.serial||'').trim(), setor_fabrica:(pc.setor_fabrica||'').trim(), data_fabricacao:(pc.data_fabricacao||'').trim(), vira_peca:(pc.vira_peca||'').trim(), vira_nome:(pc.vira_nome||'').trim(), vira_serial:(pc.vira_serial||'').trim(), vira_data:(pc.vira_data||'').trim()}; });
+  // lista de peças (repete o id conforme adicionado = quantidade de unidades)
+  const pecas=pecasCascata.map(p=>p.id).join(',');
+  const r=await api('action=salvar_produto&usuario='+encodeURIComponent(USUARIO_LOGADO)+'&id_produto='+encodeURIComponent(id)
+    +'&nome_produto='+encodeURIComponent(nome)+'&pecas='+encodeURIComponent(pecas)
+    +'&data_programada='+encodeURIComponent(data)
+    +'&info_pecas='+encodeURIComponent(JSON.stringify(infoPecas)));
+  if(r&&r.ok){
+    if(r.acao==='criado'){ msg('ok','Produto criado com '+pecasCascata.length+' peça(s)!'); }
+    else{ msg('ok','Produto atualizado!'); }
+    limparFormProduto(); carregarProdutos();
+  }
+  else{ msg('err','Falha ao salvar produto.'); }
+}
+let MAPA_PECAS={}; // id_peca -> {nome, serial}
+async function carregarMapaPecas(){
+  const lista=await api('action=listar_pecas');
+  if(Array.isArray(lista)){
+    MAPA_PECAS={};
+    lista.forEach(p=>{ MAPA_PECAS[p.id_peca]={nome:p.nome_peca||'', serial:p.serial||''}; });
+  }
+  return MAPA_PECAS;
+}
+
+async function editarProduto(id,nome,pecas,data){
+  document.getElementById('p-id').value=id;
+  document.getElementById('p-nome').value=nome;
+  document.getElementById('p-data').value=brParaIso(data);
+  // garante o mapa de peças atualizado, para trazer nome/serial de cada peça
+  await carregarMapaPecas();
+  pecasCascata=(pecas||'').split(',').map(s=>s.trim()).filter(s=>s).map(pid=>{
+    const info=MAPA_PECAS[pid]||{nome:'',serial:''};
+    return {id:pid, nome:info.nome, serial:info.serial};
+  });
+  renderCascata();
+  document.getElementById('p-id').setAttribute('readonly','true');
+  document.getElementById('form-prod-titulo').textContent='✏️ EDITANDO '+id;
+  document.getElementById('p-cancel').classList.remove('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function limparFormProduto(){
+  ['p-id','p-nome','p-data'].forEach(i=>document.getElementById(i).value='');
+  pecasCascata=[]; renderCascata();
+  document.getElementById('p-id').removeAttribute('readonly');
+  document.getElementById('form-prod-titulo').textContent='➕ NOVO PRODUTO';
+  document.getElementById('p-cancel').classList.add('hidden');
+}
+async function excluirProduto(id,qtdPecas){
+  const n=qtdPecas||0;
+  const aviso='Excluir o produto '+id+'?\n\nIsto também vai remover '+n+' peça(s) deste produto da aba Peças.\n\nEsta ação não pode ser desfeita.';
+  if(!confirm(aviso)) return;
+  msg('load','Excluindo…');
+  const r=await api('action=excluir_produto&id_produto='+encodeURIComponent(id));
+  if(r&&r.ok){
+    const pe=(r.pecas_excluidas!=null)?(' e '+r.pecas_excluidas+' peça(s)'):'';
+    msg('ok','Produto excluído'+pe+'.');
+    carregarProdutos();
+  }
+  else{ msg('err','Falha ao excluir.'); }
+}
+
+/* ══════════ PEÇAS ══════════ */
+async function carregarPecas(){
+  setStatus('Carregando peças…');
+  const lista=await api('action=listar_pecas');
+  const tb=document.querySelector('#tbl-peca tbody');
+  const vazio=document.getElementById('empty-peca');
+  if(!Array.isArray(lista)){ setStatus('Erro ao carregar'); return; }
+  if(lista.length===0){ tb.innerHTML=''; vazio.classList.remove('hidden'); setStatus('0 peças'); return; }
+  vazio.classList.add('hidden');
+  tb.innerHTML=lista.map(p=>{
+    const disp=p.status==='Disponivel';
+    const nome=(p.nome_peca||'').replace(/"/g,'&quot;');
+    const esc=s=>String(s||'').replace(/'/g,"\\'");
+    const viraEsc=esc(p.vira_peca), vnEsc=esc(p.vira_nome), vsEsc=esc(p.vira_serial), vdEsc=esc(p.vira_data);
+    return `<tr>
+      <td><strong>${p.id_peca}</strong></td>
+      <td>${p.nome_peca||''}</td>
+      <td style="font-size:11px;color:#6B7280;">${p.serial||'—'}</td>
+      <td><span class="tag ${disp?'ok':'no'}">${disp?'✅ Disponivel':'❌ Faltando'}</span></td>
+      <td style="font-size:11px;color:#9CA3AF;">${p.atualizado_em||'—'}</td>
+      <td style="font-size:11px;color:#6B7280;">${p.atualizado_por||'—'}</td>
+      <td><div class="acts">
+        <button class="btn sec sm" onclick="editarPeca(${p.linha},'${p.id_peca}','${nome}','${p.status}','${p.serial||''}','${p.setor_fabrica||''}','${p.data_fabricacao||''}','${viraEsc}','${vnEsc}','${vsEsc}','${vdEsc}')">Editar</button>
+        <button class="btn del sm" onclick="excluirPeca(${p.linha},'${p.id_peca}')">Excluir</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  setStatus(lista.length+' peça(s)');
+}
+
+let _linhaEditando=0; // linha exata da peça sendo editada (resolve IDs repetidos)
+async function salvarPeca(){
+  const id=document.getElementById('pc-id').value.trim();
+  if(!id){ msg('err','Informe o ID da peça.'); return; }
+  const nome=document.getElementById('pc-nome').value.trim();
+  const serial=document.getElementById('pc-serial').value.trim();
+  const status=document.getElementById('pc-status').value;
+  const setorfab=document.getElementById('pc-setorfab').value;
+  const datafab=isoParaBR(document.getElementById('pc-datafab').value);
+  const vira=document.getElementById('pc-vira').value.trim();
+  const viranome=document.getElementById('pc-viranome').value.trim();
+  const viraserial=document.getElementById('pc-viraserial').value.trim();
+  const viradata=isoParaBR(document.getElementById('pc-viradata').value);
+  msg('load','Salvando…');
+  const r=await api('action=salvar_peca&usuario='+encodeURIComponent(USUARIO_LOGADO)+'&id_peca='+encodeURIComponent(id)
+    +'&nome_peca='+encodeURIComponent(nome)+'&serial='+encodeURIComponent(serial)+'&status='+encodeURIComponent(status)
+    +'&setor_fabrica='+encodeURIComponent(setorfab)+'&data_fabricacao='+encodeURIComponent(datafab)
+    +'&vira_peca='+encodeURIComponent(vira)+'&vira_nome='+encodeURIComponent(viranome)
+    +'&vira_serial='+encodeURIComponent(viraserial)+'&vira_data='+encodeURIComponent(viradata)
+    +(_linhaEditando?'&linha='+_linhaEditando:''));
+  if(r&&r.ok){ msg('ok','Peça '+(r.acao||'salva')+'!'); limparFormPeca(); carregarPecas(); }
+  else{ msg('err','Falha ao salvar peça.'); }
+}
+function editarPeca(linha,id,nome,status,serial,setorfab,datafab,vira,viranome,viraserial,viradata){
+  _linhaEditando=Number(linha)||0;
+  document.getElementById('pc-id').value=id;
+  document.getElementById('pc-nome').value=nome;
+  document.getElementById('pc-serial').value=serial||'';
+  document.getElementById('pc-status').value=status||'Faltando';
+  document.getElementById('pc-setorfab').value=setorfab||'';
+  document.getElementById('pc-datafab').value=brParaIso(datafab||'');
+  document.getElementById('pc-vira').value=vira||'';
+  document.getElementById('pc-viranome').value=viranome||'';
+  document.getElementById('pc-viraserial').value=viraserial||'';
+  document.getElementById('pc-viradata').value=brParaIso(viradata||'');
+  toggleViraPeca();
+  document.getElementById('pc-id').setAttribute('readonly','true');
+  document.getElementById('form-peca-titulo').textContent='✏️ EDITANDO '+id+' (linha '+_linhaEditando+')';
+  document.getElementById('pc-cancel').classList.remove('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
+  autoNome('pc-id','pc-nome'); // reaplica trava do nome
+}
+function limparFormPeca(){
+  _linhaEditando=0;
+  ['pc-id','pc-nome','pc-serial','pc-datafab','pc-vira','pc-viranome','pc-viraserial','pc-viradata'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('pc-status').value='Faltando';
+  document.getElementById('pc-setorfab').value='';
+  toggleViraPeca();
+  document.getElementById('pc-id').removeAttribute('readonly');
+  document.getElementById('form-peca-titulo').textContent='➕ NOVA PEÇA';
+  document.getElementById('pc-cancel').classList.add('hidden');
+  autoNome('pc-id','pc-nome'); // reaplica trava do nome
+}
+async function excluirPeca(linha,id){
+  if(!confirm('Excluir a peça '+id+' (linha '+linha+')? Esta ação não pode ser desfeita.')) return;
+  msg('load','Excluindo…');
+  const r=await api('action=excluir_peca&linha='+encodeURIComponent(linha)+'&id_peca='+encodeURIComponent(id));
+  if(r&&r.ok){ msg('ok','Peça excluída.'); carregarPecas(); }
+  else{ msg('err','Falha ao excluir.'); }
+}
+
+/* ── INIT ── */
+// mostra o campo "Vira a peça" só quando o setor é Célula de Estruturas
+// Mapeamento fixo de código base -> nome da peça (preenche o nome automaticamente)
+const NOMES_PADRAO={
+  'EST-PISO-P':'Estrutura Piso Padrão',
+  'PISO-CAD-P':'Piso CAD Padrão',
+  'EST-PISO-E':'Estrutura Piso Específico',
+  'PISO-CAD-E':'Piso CAD Específico',
+  'EST-TETO-E':'Estrutura Teto Específico',
+  'TETO-GRC-E':'Teto GRC Específico',
+  'EST-TETO-P':'Estrutura Teto Padrão',
+  'TETO-GRC-P':'Teto GRC Padrão'
+};
+// extrai o código base do ID (remove o sufixo do produto se houver) e busca o nome
+function nomePorId(id){
+  id=String(id||'').trim().toUpperCase();
+  if(!id) return null;
+  // tenta o ID inteiro
+  if(NOMES_PADRAO[id]) return NOMES_PADRAO[id];
+  // tenta o código base (antes do -CI-...)
+  const m=id.match(/^(.*?)-CI-\d+-\d+-P\d+$/i);
+  if(m && NOMES_PADRAO[m[1]]) return NOMES_PADRAO[m[1]];
+  // tenta achar um código base que seja prefixo
+  for(const base in NOMES_PADRAO){ if(id===base) return NOMES_PADRAO[base]; }
+  return null;
+}
+// ao mudar o ID, preenche o nome automaticamente e trava se for código padrão
+function autoNome(idCampo, nomeCampo){
+  const idEl=document.getElementById(idCampo), nomeEl=document.getElementById(nomeCampo);
+  if(!idEl||!nomeEl) return;
+  const nome=nomePorId(idEl.value);
+  if(nome){ nomeEl.value=nome; nomeEl.setAttribute('readonly','true'); nomeEl.style.background='#F0F6FC'; }
+  else{ nomeEl.removeAttribute('readonly'); nomeEl.style.background=''; }
+}
+
+function toggleViraPeca(){
+  const ehCelula=v=>String(v||'').trim().toLowerCase()==='célula de estruturas';
+  const np=document.getElementById('np-setorfab'), pc=document.getElementById('pc-setorfab');
+  const mostraNp=np&&ehCelula(np.value), mostraPc=pc&&ehCelula(pc.value);
+  ['fld-np-vira','fld-np-viranome','fld-np-viraserial','fld-np-viradata'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display=mostraNp?'':'none';
+  });
+  ['fld-pc-vira','fld-pc-viranome','fld-pc-viraserial','fld-pc-viradata'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display=mostraPc?'':'none';
+  });
+}
+document.getElementById('np-setorfab').addEventListener('change',toggleViraPeca);
+document.getElementById('pc-setorfab').addEventListener('change',toggleViraPeca);
+// auto-preenchimento do nome ao digitar/sair do campo ID
+document.getElementById('np-id').addEventListener('input',()=>autoNome('np-id','np-nome'));
+document.getElementById('pc-id').addEventListener('input',()=>autoNome('pc-id','pc-nome'));
+
+// Carrega os setores da configuração e preenche os selects (com fallback para os padrão)
+let SETORES_VALIDOS=['CAD','GRC','Célula de Estruturas']; // atualizado ao carregar
+async function carregarSetoresConfig(){
+  let setores=['CAD','GRC','Célula de Estruturas']; // fallback
+  try{
+    const r=await api('action=listar_setores');
+    if(r&&r.ok&&r.setores&&r.setores.length){
+      setores=r.setores.filter(s=>s.ativo!==false).map(s=>s.setor);
+    }
+  }catch(_){}
+  SETORES_VALIDOS=setores;
+  ['np-setorfab','pc-setorfab'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel) return;
+    const atual=sel.value;
+    sel.innerHTML='<option value="">—</option>'+setores.map(s=>`<option value="${s}">${s}</option>`).join('');
+    if(atual) sel.value=atual;
+  });
+}
+
+function aoLogar(){ renderCascata(); carregarProdutos(); }
+renderCascata();
+checarLogin();
+carregarSetoresConfig();
+if(USUARIO_LOGADO) carregarProdutos();
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>

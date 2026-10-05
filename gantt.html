@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planejamento de linha — Visia</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1A2540">
+<style>
+  :root{
+    --marinho:#1A2540; --azul:#185FA5; --fundo:#EEF1F5; --linha:#E1E6EC;
+    --texto:#1A2540; --suave:#6B7280; --verde:#1D9E75; --ambar:#EF9F27; --vermelho:#E24B4A; --cinza:#C4CDD8;
+    --col:270px; --dia:28px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--fundo);color:var(--texto);}
+  header{background:var(--marinho);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  header .logo{font-size:22px;font-weight:800;color:#5FA8E8;letter-spacing:.5px;}
+  header h1{font-size:16px;font-weight:700;flex:1;}
+  header a{color:#B9C4D4;text-decoration:none;font-size:13px;padding:6px 12px;border:1px solid rgba(255,255,255,.2);border-radius:7px;}
+  .barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 22px;background:#fff;border-bottom:1px solid var(--linha);}
+  .barra button{font-size:13px;padding:7px 12px;border:1px solid #D8DCE3;background:#F5F7FA;border-radius:7px;cursor:pointer;color:#374151;}
+  .barra button:hover{background:#E9EDF2;}
+  .barra button:focus-visible,.nome-mod:focus-visible{outline:2px solid var(--azul);outline-offset:2px;}
+  .legenda{display:flex;gap:14px;flex-wrap:wrap;margin-left:auto;font-size:12px;color:var(--suave);}
+  .legenda span{display:inline-flex;align-items:center;gap:5px;}
+  .lg-dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
+  #status{font-size:13px;color:var(--suave);padding:10px 22px;}
+
+  /* área do gráfico: rolagem horizontal; coluna da esquerda fixa */
+  .area{overflow:auto;max-height:calc(100vh - 170px);background:#fff;margin:0 22px 22px;border:1px solid var(--linha);border-radius:10px;}
+  .grade{position:relative;min-width:max-content;}
+  .row{display:flex;border-bottom:1px solid #F0F2F5;min-height:34px;}
+  .esq{position:sticky;left:0;z-index:3;width:var(--col);flex-shrink:0;background:#fff;border-right:1px solid var(--linha);padding:6px 12px;display:flex;flex-direction:column;justify-content:center;}
+  .faixa{position:relative;flex-shrink:0;}
+
+  /* cabeçalho de datas (fixo no topo) */
+  .cab{position:sticky;top:0;z-index:4;background:#fff;}
+  .cab .esq{z-index:5;font-size:12px;color:var(--suave);}
+  .meses,.dias{position:relative;height:22px;}
+  .mes{position:absolute;top:0;height:22px;font-size:12px;font-weight:700;color:var(--texto);padding:3px 6px;border-left:1px solid var(--linha);white-space:nowrap;}
+  .dia{position:absolute;top:0;height:22px;font-size:10px;color:var(--suave);text-align:center;line-height:22px;border-left:1px solid #F3F4F6;}
+  .dia.fds{background:#FAFAFB;}
+
+  /* fundo de grade (fins de semana) e linha de hoje */
+  .fdsbg{position:absolute;top:0;bottom:0;background:#FAFAFB;}
+  .hoje{position:absolute;top:0;bottom:0;width:2px;background:var(--vermelho);z-index:2;opacity:.7;}
+
+  /* módulo */
+  .mod .esq{cursor:pointer;}
+  .nome-mod{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;background:none;border:none;color:inherit;cursor:pointer;text-align:left;font-family:inherit;}
+  .seta{font-size:10px;color:var(--azul);width:12px;display:inline-block;transition:transform .15s;}
+  .aberto .seta{transform:rotate(90deg);}
+  .datas-mod{font-size:11px;color:var(--suave);margin-top:2px;}
+  .aviso{color:var(--ambar);font-weight:600;}
+  .barra-mod{position:absolute;top:7px;height:20px;background:var(--azul);border-radius:5px;color:#fff;font-size:11px;font-weight:600;padding:2px 7px;white-space:nowrap;overflow:hidden;}
+  .marco{position:absolute;top:8px;width:16px;height:16px;transform:rotate(45deg);background:var(--azul);border-radius:3px;}
+
+  /* janela do módulo repetida nas linhas das peças */
+  .janela{position:absolute;top:0;bottom:0;background:rgba(24,95,165,.08);border-left:1px dashed rgba(24,95,165,.45);border-right:1px dashed rgba(24,95,165,.45);}
+
+  /* peças */
+  .peca .esq{padding-left:32px;}
+  .peca .id{font-size:12px;font-weight:600;}
+  .peca .nm{font-size:11px;color:var(--suave);}
+  .peca.estr .esq{padding-left:44px;}
+  .mk{position:absolute;top:9px;width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);}
+  .mk.a_produzir{background:#fff;border:2px solid var(--cinza);}
+  .mk.produzida{background:var(--verde);}
+  .mk.entregue{background:var(--azul);}
+  .mk.durante{box-shadow:0 0 0 3px var(--ambar);}
+  .mk.depois{box-shadow:0 0 0 3px var(--vermelho);}
+  .semdata{position:absolute;top:9px;left:8px;font-size:11px;color:var(--suave);font-style:italic;}
+  .oculto{display:none;}
+  @media (max-width:640px){ :root{--col:190px;} .legenda{margin-left:0;} }
+  @media (prefers-reduced-motion:reduce){ .seta{transition:none;} }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">VISIA</span>
+  <h1>Planejamento de linha</h1>
+  <a href="index.html">&larr; Menu</a>
+</header>
+
+<div class="barra">
+  <button onclick="expandirTodos(true)">Abrir todos</button>
+  <button onclick="expandirTodos(false)">Fechar todos</button>
+  <button onclick="zoom(-1)" aria-label="Diminuir zoom">−</button>
+  <button onclick="zoom(1)" aria-label="Aumentar zoom">+</button>
+  <button onclick="irParaHoje()">Ir para hoje</button>
+  <div class="legenda">
+    <span><span class="lg-dot" style="background:var(--azul);border-radius:3px;"></span>Módulo na linha</span>
+    <span><span class="lg-dot" style="background:#fff;border:2px solid var(--cinza);"></span>A produzir</span>
+    <span><span class="lg-dot" style="background:var(--verde);"></span>Produzida</span>
+    <span><span class="lg-dot" style="background:var(--azul);"></span>Entregue na montagem</span>
+    <span><span class="lg-dot" style="background:#fff;box-shadow:0 0 0 3px var(--ambar);"></span>Fabricada com o módulo na linha</span>
+    <span><span class="lg-dot" style="background:#fff;box-shadow:0 0 0 3px var(--vermelho);"></span>Fabricada após a saída</span>
+  </div>
+</div>
+
+<div id="status">Carregando o planejamento…</div>
+<div class="area" id="area"><div class="grade" id="grade"></div></div>
+
+<script>
+const URL='https://script.google.com/macros/s/AKfycbyRmbuI33AEe4LJObYZZ4WPujjc3fyzAzHHMd1kli1pUQaar-Y99xulhfRgixecuoW0/exec';
+let MODULOS=[], ABERTOS=new Set(), DIA=28, INI=0, FIM=0;
+
+/* comunicação (JSONP + fallback), igual às demais telas */
+let _cb=0;
+function jsonp(params){
+  return new Promise((res,rej)=>{
+    const cb='__cbg'+(_cb++); const s=document.createElement('script');
+    const to=setTimeout(()=>{limpa();rej(new Error('timeout'));},15000);
+    function limpa(){clearTimeout(to);delete window[cb];s.remove();}
+    window[cb]=d=>{limpa();res(d);};
+    s.onerror=()=>{limpa();rej(new Error('erro'));};
+    s.src=URL+'?'+params+'&callback='+cb+'&t='+Date.now();
+    document.body.appendChild(s);
+  });
+}
+async function api(params){
+  try{ return await jsonp(params); }catch(_){}
+  try{ const r=await fetch(URL+'?'+params+'&t='+Date.now(),{cache:'no-store'}); if(r.ok) return JSON.parse(await r.text()); }catch(_){}
+  return null;
+}
+
+/* datas: "dd/mm/aaaa" -> número de dias (UTC), sem efeito de fuso */
+function dia(s){
+  const m=String(s||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? Math.floor(Date.UTC(+m[3],+m[2]-1,+m[1])/86400000) : null;
+}
+function fmt(d){ const x=new Date(d*86400000); return String(x.getUTCDate()).padStart(2,'0')+'/'+String(x.getUTCMonth()+1).padStart(2,'0'); }
+const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function px(d){ return (d-INI)*DIA; }
+/* tira o sufixo do produto do ID da peça (o produto já está na linha do módulo) */
+function idCurto(id){ const m=String(id||'').match(/^(.*?)-(CI-\d+-\d+-P\d+)$/i); return m?m[1]:String(id||''); }
+
+/* posição da peça em relação à janela do módulo */
+function fase(dfab,ent,sai){
+  if(dfab==null||ent==null) return '';
+  if(dfab<ent) return '';               // antes da entrada: o normal
+  if(sai!=null && dfab>sai) return 'depois';
+  return 'durante';
+}
+
+/* lista as peças do módulo, incluindo as estruturas vinculadas logo abaixo da peça-mãe */
+function pecasDe(m){
+  const out=[];
+  (m.pecas||[]).forEach(pc=>{
+    out.push({...pc, estr:false});
+    if(pc.estrutura) out.push({...pc.estrutura, estr:true});
+  });
+  return out;
+}
+
+async function carregar(){
+  const r=await api('action=abastecimento');
+  const st=document.getElementById('status');
+  if(!Array.isArray(r)){ st.textContent='Não foi possível carregar o planejamento. Verifique a conexão e recarregue a página.'; return; }
+  MODULOS=r.map(m=>({...m, ent:dia(m.data_entrada), sai:dia(m.data_saida)}))
+           .sort((a,b)=>(a.ent??9e9)-(b.ent??9e9));
+  if(!MODULOS.length){ st.textContent='Nenhum módulo cadastrado ainda. Importe o planejamento pela aba Cadastro.'; return; }
+  // intervalo do gráfico: todas as entradas, saídas e fabricações, com folga de 3 dias
+  const datas=[];
+  MODULOS.forEach(m=>{ [m.ent,m.sai].forEach(d=>d!=null&&datas.push(d)); pecasDe(m).forEach(p=>{const d=dia(p.data_fab); if(d!=null) datas.push(d);}); });
+  const hoje=Math.floor(Date.now()/86400000); datas.push(hoje);
+  INI=Math.min(...datas)-3; FIM=Math.max(...datas)+3;
+  const semSaida=MODULOS.filter(m=>m.sai==null).length;
+  st.textContent=MODULOS.length+' módulo(s). '+(semSaida?semSaida+' sem data de saída: inclua a coluna data_saida na importação.':'Clique num módulo para ver as peças.');
+  desenhar();
+  irParaHoje();
+}
+
+function desenhar(){
+  const g=document.getElementById('grade');
+  const largura=(FIM-INI+1)*DIA;
+  const hoje=Math.floor(Date.now()/86400000);
+  let h='';
+
+  // cabeçalho: meses e dias
+  let meses='', dias='', fds='';
+  let mesAtual=-1;
+  for(let d=INI; d<=FIM; d++){
+    const x=new Date(d*86400000), wd=x.getUTCDay(), fim=(wd===0||wd===6);
+    if(x.getUTCMonth()!==mesAtual){ mesAtual=x.getUTCMonth(); meses+=`<div class="mes" style="left:${px(d)}px">${MESES[mesAtual]} ${x.getUTCFullYear()}</div>`; }
+    dias+=`<div class="dia${fim?' fds':''}" style="left:${px(d)}px;width:${DIA}px">${DIA>=20?x.getUTCDate():''}</div>`;
+    if(fim) fds+=`<div class="fdsbg" style="left:${px(d)}px;width:${DIA}px"></div>`;
+  }
+  h+=`<div class="row cab"><div class="esq">Módulo / peça</div><div class="faixa" style="width:${largura}px"><div class="meses">${meses}</div><div class="dias">${dias}</div></div></div>`;
+
+  const linhaHoje=(hoje>=INI&&hoje<=FIM)?`<div class="hoje" style="left:${px(hoje)+DIA/2}px" title="Hoje"></div>`:'';
+
+  MODULOS.forEach((m,i)=>{
+    const aberto=ABERTOS.has(m.id_produto);
+    let barra='';
+    if(m.ent!=null && m.sai!=null && m.sai>=m.ent){
+      const w=(m.sai-m.ent+1)*DIA;
+      barra=`<div class="barra-mod" style="left:${px(m.ent)}px;width:${w}px" title="${m.id_produto}: entrada ${m.data_entrada}, saída ${m.data_saida}">${w>70?m.id_produto:''}</div>`;
+    } else if(m.ent!=null){
+      barra=`<div class="marco" style="left:${px(m.ent)+DIA/2-8}px" title="${m.id_produto}: entrada ${m.data_entrada} (sem saída cadastrada)"></div>`;
+    }
+    const pecas=pecasDe(m);
+    const datasTxt=m.ent==null?'Sem data de entrada'
+      : m.sai==null?`Entrada ${fmt(m.ent)} <span class="aviso">(sem saída)</span>`
+      : `Entrada ${fmt(m.ent)}, saída ${fmt(m.sai)}`;
+    h+=`<div class="row mod${aberto?' aberto':''}">
+      <div class="esq" onclick="alternar(${i})">
+        <button class="nome-mod" aria-expanded="${aberto}" onclick="event.stopPropagation();alternar(${i})"><span class="seta">▶</span>${m.id_produto}</button>
+        <div class="datas-mod">${datasTxt} — ${pecas.length} peça(s)</div>
+      </div>
+      <div class="faixa" style="width:${largura}px">${fds}${linhaHoje}${barra}</div>
+    </div>`;
+
+    if(aberto){
+      const janela=(m.ent!=null)?`<div class="janela" style="left:${px(m.ent)}px;width:${((m.sai??m.ent)-m.ent+1)*DIA}px"></div>`:'';
+      pecas.forEach(p=>{
+        const d=dia(p.data_fab);
+        const f=fase(d,m.ent,m.sai);
+        const nomeFase=f==='durante'?' — fabricada com o módulo na linha':f==='depois'?' — fabricada após a saída do módulo':'';
+        const estadoTxt={a_produzir:'a produzir',produzida:'produzida',entregue:'entregue na montagem'}[p.estado]||p.estado||'';
+        const marcador=d!=null
+          ? `<div class="mk ${p.estado||'a_produzir'} ${f}" style="left:${px(d)+DIA/2-8}px" title="${p.id}: fabricação ${p.data_fab}, ${estadoTxt}${nomeFase}"></div>`
+          : `<div class="semdata">sem data de fabricação</div>`;
+        h+=`<div class="row peca${p.estr?' estr':''}">
+          <div class="esq"><span class="id" title="${p.id}">${p.estr?'↳ ':''}${idCurto(p.id)}</span><span class="nm">${p.nome||''}</span></div>
+          <div class="faixa" style="width:${largura}px">${fds}${janela}${linhaHoje}${marcador}</div>
+        </div>`;
+      });
+    }
+  });
+  g.innerHTML=h;
+}
+
+function alternar(i){ const id=MODULOS[i].id_produto; ABERTOS.has(id)?ABERTOS.delete(id):ABERTOS.add(id); desenhar(); }
+function expandirTodos(abrir){ ABERTOS=abrir?new Set(MODULOS.map(m=>m.id_produto)):new Set(); desenhar(); }
+function zoom(dir){
+  const passos=[8,12,18,28,40,56];
+  let k=passos.indexOf(DIA); if(k<0) k=3;
+  k=Math.max(0,Math.min(passos.length-1,k+dir)); DIA=passos[k];
+  document.documentElement.style.setProperty('--dia',DIA+'px'); desenhar();
+}
+function irParaHoje(){
+  const hoje=Math.floor(Date.now()/86400000);
+  const area=document.getElementById('area');
+  area.scrollLeft=Math.max(0,px(hoje)-area.clientWidth/3);
+}
+
+carregar();
+</script>
+</body>
+</html>
