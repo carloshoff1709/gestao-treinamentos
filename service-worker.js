@@ -1,49 +1,58 @@
-/**
- * Service Worker do app.
- * Faz cache dos arquivos estáticos (para abrir mesmo sem internet e ser
- * instalável). As chamadas à API (Apps Script) são sempre cross-origin e
- * NUNCA passam por este cache — são sempre buscadas ao vivo, pois os dados
- * da fábrica mudam a cada avaliação.
- */
-const CACHE_NOME = 'app-treinamentos-v1';
-const ARQUIVOS_ESTATICOS = [
-  './',
+/* Service Worker — Visia Produção PWA
+   Estratégia: network-first para tudo. Nunca faz cache das chamadas ao
+   Apps Script (dados sempre atuais). Só serve para tornar o app instalável
+   e dar um fallback básico offline das telas já visitadas. */
+
+const CACHE = 'visia-v3';
+const ESSENCIAIS = [
   'index.html',
-  'style.css',
-  'app.js',
-  'api-config.js',
-  'manifest.json',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/apple-touch-icon.png'
+  'conferencia.html',
+  'cadastro.html',
+  'leitor.html',
+  'abastecimento.html',
+  'gantt.html',
+  'setores.html',
+  'manifest.json'
 ];
 
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NOME).then(cache => cache.addAll(ARQUIVOS_ESTATICOS)));
+self.addEventListener('install', (e) => {
   self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(ESSENCIAIS).catch(() => {}))
+  );
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(nomes => Promise.all(nomes.filter(n => n !== CACHE_NOME).map(n => caches.delete(n))))
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+    )
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
+self.addEventListener('fetch', (e) => {
+  const url = e.request.url;
 
-  // Nunca intercepta chamadas de API fora do domínio do site (Apps Script) — sempre rede, nunca cache.
-  if (url.origin !== self.location.origin) return;
-  if (event.request.method !== 'GET') return;
+  // NUNCA intercepta chamadas ao Apps Script, Google, ou proxies (dados ao vivo)
+  if (url.includes('script.google.com') ||
+      url.includes('googleusercontent') ||
+      url.includes('corsproxy') ||
+      url.includes('allorigins') ||
+      url.includes('cdn.jsdelivr') ||
+      url.includes('cdnjs.cloudflare')) {
+    return; // deixa passar direto para a rede
+  }
 
-  event.respondWith(
-    fetch(event.request)
-      .then(resp => {
+  // Para os arquivos do app: network-first, com fallback ao cache
+  e.respondWith(
+    fetch(e.request)
+      .then((resp) => {
+        // atualiza o cache com a versão nova
         const copia = resp.clone();
-        caches.open(CACHE_NOME).then(cache => cache.put(event.request, copia));
+        caches.open(CACHE).then((c) => c.put(e.request, copia).catch(() => {}));
         return resp;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(e.request))
   );
 });
